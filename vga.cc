@@ -346,6 +346,12 @@ extern "C" void stm32f4xx_tim8_cc_handler() {
   }
 }
 
+static void rasterize(unsigned line, unsigned char *buf) {
+  for (unsigned i = 0; i < 800; ++i) {
+    buf[i] = (line >> 2) ^ (i >> 2);
+  }
+}
+
 void v7m_pend_sv_handler() {
   // Flip working_buffer into scan_buffer.
   // We know its contents are ready because otherwise we wouldn't take a new
@@ -358,5 +364,6 @@ void v7m_pend_sv_handler() {
                          static_cast<void *>(vga::scan_buffer)),
                      sizeof(vga::working_buffer) / 4);
 
-  // TODO(cbiffle): now produce a new working buffer.
+  rasterize(vga::current_line - vga::current_mode->video_start_line,
+            vga::working_buffer);
 }

@@ -222,7 +222,7 @@ void select_mode(VideoMode const &mode) {
 /*******************************************************************************
  * Horizontal timing interrupt.
  */
-extern "C" void stm32f4xx_tim8_cc_handler() {
+void stm32f4xx_tim8_cc_handler() {
   // We have to clear our interrupt flags, or this will recur.
   auto sr = tim8.read_sr();
   tim8.write_sr(sr.with_cc2if(false).with_cc3if(false));

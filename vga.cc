@@ -10,6 +10,7 @@
 #include "lib/stm32f4xx/gpio.h"
 #include "lib/stm32f4xx/interrupts.h"
 #include "lib/stm32f4xx/rcc.h"
+#include "lib/stm32f4xx/syscfg.h"
 
 using stm32f4xx::AdvTimer;
 using stm32f4xx::AhbPeripheral;
@@ -21,6 +22,7 @@ using stm32f4xx::gpioc;
 using stm32f4xx::gpioe;
 using stm32f4xx::Interrupt;
 using stm32f4xx::rcc;
+using stm32f4xx::syscfg;
 using stm32f4xx::tim8;
 using stm32f4xx::Word;
 
@@ -60,7 +62,9 @@ ALIGNED(4) IN_SCAN_RAM
 static unsigned char scan_buffer[max_pixels_per_line + 4];
 
 void init() {
-  // TODO(cbiffle): original code turned on I/O compensation.  Should we?
+  // Turn on I/O compensation cell to reduce noise on power supply.
+  rcc.enable_clock(ApbPeripheral::syscfg);
+  syscfg.write_cmpcr(syscfg.read_cmpcr().with_cmp_pd(true));
 
   // Turn a bunch of stuff on.
   rcc.enable_clock(ApbPeripheral::tim8);
@@ -90,15 +94,16 @@ void video_on() {
   // Configure PC6 to produce hsync using TIM8_CH1
   gpioc.set_alternate_function(Gpio::p6, 3);
   gpioc.set_output_type(Gpio::p6, Gpio::OutputType::push_pull);
-  gpioc.set_output_speed(Gpio::p6, Gpio::OutputSpeed::high_100mhz);
+  gpioc.set_output_speed(Gpio::p6, Gpio::OutputSpeed::fast_50mhz);
   gpioc.set_mode(Gpio::p6, Gpio::Mode::alternate);
 
   // Configure PC7 as GPIO output.
   gpioc.set_output_type(Gpio::p7, Gpio::OutputType::push_pull);
-  gpioc.set_output_speed(Gpio::p7, Gpio::OutputSpeed::high_100mhz);
+  gpioc.set_output_speed(Gpio::p7, Gpio::OutputSpeed::fast_50mhz);
   gpioc.set_mode(Gpio::p7, Gpio::Mode::gpio);
 
   // Configure the high byte of port E for parallel video.
+  // Using 100MHz output speed gets slightly sharper transitions than 50MHz.
   gpioe.set_output_type(0xFF00, Gpio::OutputType::push_pull);
   gpioe.set_output_speed(0xFF00, Gpio::OutputSpeed::high_100mhz);
   gpioe.set_mode(0xFF00, Gpio::Mode::gpio);

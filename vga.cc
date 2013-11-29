@@ -34,6 +34,8 @@ using stm32f4xx::Word;
 #define IN_SCAN_RAM SECTION(".vga_scan_ram")
 #define IN_LOCAL_RAM SECTION(".vga_local_ram")
 
+#define RAM_CODE SECTION(".ramcode")
+
 namespace vga {
 
 /*******************************************************************************
@@ -222,7 +224,7 @@ void select_mode(VideoMode const &mode) {
 /*******************************************************************************
  * Horizontal timing interrupt.
  */
-void stm32f4xx_tim8_cc_handler() {
+RAM_CODE void stm32f4xx_tim8_cc_handler() {
   // We have to clear our interrupt flags, or this will recur.
   auto sr = tim8.read_sr();
   tim8.write_sr(sr.with_cc2if(false).with_cc3if(false));
@@ -354,12 +356,14 @@ void stm32f4xx_tim8_cc_handler() {
   }
 }
 
+RAM_CODE
 static void rasterize(unsigned line, unsigned char *buf) {
   for (unsigned i = 0; i < 800; ++i) {
     buf[i] = (line >> 2) ^ (i >> 2);
   }
 }
 
+RAM_CODE
 void v7m_pend_sv_handler() {
   // Flip working_buffer into scan_buffer.
   // We know its contents are ready because otherwise we wouldn't take a new

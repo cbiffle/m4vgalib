@@ -10,6 +10,7 @@
 #include "lib/stm32f4xx/ahb.h"
 #include "lib/stm32f4xx/apb.h"
 #include "lib/stm32f4xx/dma.h"
+#include "lib/stm32f4xx/flash.h"
 #include "lib/stm32f4xx/gpio.h"
 #include "lib/stm32f4xx/interrupts.h"
 #include "lib/stm32f4xx/rcc.h"
@@ -20,6 +21,7 @@ using stm32f4xx::AhbPeripheral;
 using stm32f4xx::ApbPeripheral;
 using stm32f4xx::Dma;
 using stm32f4xx::dma2;
+using stm32f4xx::flash;
 using stm32f4xx::Gpio;
 using stm32f4xx::gpioc;
 using stm32f4xx::gpioe;
@@ -151,6 +153,12 @@ void select_mode(VideoMode const &mode) {
 
   // Switch to new CPU clock settings.
   rcc.configure_clocks(*mode.clock_config);
+
+  // Enable Flash cache and prefetching to try and reduce jitter.
+  flash.write_acr(flash.read_acr()
+                  .with_dcen(true)
+                  .with_icen(true)
+                  .with_prften(true));
 
   // Configure TIM8 for horizontal sync generation.
   rcc.leave_reset(ApbPeripheral::tim8);

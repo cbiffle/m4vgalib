@@ -30,10 +30,18 @@ using stm32f4xx::Word;
 
 namespace vga {
 
+/*******************************************************************************
+ * Driver state and configuration.
+ */
+
+// Used to adjust size of scan_buffer, below.
 static constexpr unsigned max_pixels_per_line = 800;
 
-static unsigned volatile current_line;
+// The current mode, set by select_mode.
 static VideoMode const *current_mode;
+
+// [0, current_mode.video_end_line).  Updated at front porch interrupt.
+static unsigned volatile current_line;
 
 /*
  * The vertical timing state.  This is a Gray code and the bits have meaning.
@@ -56,10 +64,17 @@ inline bool is_rendered_state(State s) {
   return static_cast<unsigned>(s) & 0b01;
 }
 
+// Finally, the actual variable.
 static State volatile state;
 
+// This is the DMA source for scan-out, filled during pend_sv.
 ALIGNED(4) IN_SCAN_RAM
 static unsigned char scan_buffer[max_pixels_per_line + 4];
+
+
+/*******************************************************************************
+ * Driver API.
+ */
 
 void init() {
   // Turn on I/O compensation cell to reduce noise on power supply.
@@ -184,6 +199,9 @@ void select_mode(VideoMode const &mode) {
 
 }  // namespace vga
 
+/*******************************************************************************
+ * Horizontal timing interrupt.
+ */
 extern "C" void stm32f4xx_tim8_cc_handler() {
   // We have to clear our interrupt flags, or this will recur.
   auto sr = tim8.read_sr();
@@ -192,7 +210,7 @@ extern "C" void stm32f4xx_tim8_cc_handler() {
   vga::VideoMode const &mode = *vga::current_mode;
 
   if (sr.get_cc2if()) {
-    // CC2 indicates start of active video.
+    // CC2 indicates start of active video (end of back porch).
     // This only matters in displayed states.
     if (is_displayed_state(vga::state)) {
       // Clear stream 1 flags (lifcr is a write-1-to-clear register).
@@ -292,7 +310,7 @@ extern "C" void stm32f4xx_tim8_cc_handler() {
   }
 
   if (sr.get_cc3if()) {
-    // CC3 indicates end of active video.
+    // CC3 indicates end of active video (start of front porch).
     unsigned line = vga::current_line;
 
     if (line == 0) {

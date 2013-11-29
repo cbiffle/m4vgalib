@@ -24,6 +24,29 @@ namespace vga {
 static unsigned volatile current_line;
 static VideoMode const *current_mode;
 
+/*
+ * The vertical timing state.  This is a Gray code and the bits have meaning.
+ * See the inspector functions below.
+ */
+enum class State {
+  blank     = 0b00,
+  starting  = 0b01,
+  active    = 0b11,
+  finishing = 0b10,
+};
+
+// Should we be producing a video signal?
+inline bool is_displayed_state(State s) {
+  return static_cast<unsigned>(s) & 0b10;
+}
+
+// Should we be rendering a scanline?
+inline bool is_rendered_state(State s) {
+  return static_cast<unsigned>(s) & 0b01;
+}
+
+static State volatile state;
+
 void init() {
   // TODO(cbiffle): original code turned on I/O compensation.  Should we?
 
@@ -144,6 +167,11 @@ extern "C" void stm32f4xx_tim8_cc_handler() {
   if (sr.get_cc2if()) {
     // CC2 indicates start of active video.
     // TODO(cbiffle): kick off DMA here.
+
+    // hack hack
+    if (is_displayed_state(vga::state)) {
+      gpioe.set(0xFF00);
+    }
   }
 
   if (sr.get_cc3if()) {
@@ -151,8 +179,12 @@ extern "C" void stm32f4xx_tim8_cc_handler() {
     unsigned line = vga::current_line;
     vga::VideoMode const &mode = *vga::current_mode;
 
+    // hack hack
+    gpioe.clear(0xFF00);
+
     if (line == 0) {
       // Start of frame!  Time to stop displaying pixels.
+      vga::state = vga::State::blank;
       // TODO(cbiffle): suppress video output.
       // TODO(cbiffle): latch configuration changes.
     } else if (line == mode.vsync_start_line
@@ -161,17 +193,21 @@ extern "C" void stm32f4xx_tim8_cc_handler() {
       gpioc.toggle(Gpio::p7);
     } else if (line == static_cast<unsigned short>(mode.video_start_line - 1)) {
       // Time to start generating the first scan buffer.
-      // TODO(cbiffle): kick that off somehow.
+      vga::state = vga::State::starting;
     } else if (line == mode.video_start_line) {
       // Time to start output.
-      // TODO(cbiffle): record that in a way that CC2 will notice later.
+      vga::state = vga::State::active;
     } else if (line == static_cast<unsigned short>(mode.video_end_line - 1)) {
       // Time to stop rendering new scan buffers.
-      // TODO(cbiffle): stop whatever you did to start this.
+      vga::state = vga::State::finishing;
       line = static_cast<unsigned>(-1);  // Make line roll over to zero.
     }
 
     vga::current_line = line + 1;
+
+    if (is_rendered_state(vga::state)) {
+      // TODO(cbiffle): PendSV to kick off a buffer flip and rasterization.
+    }
   }
 }
 

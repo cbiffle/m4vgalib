@@ -18,7 +18,7 @@ struct VideoMode {
 
   typedef unsigned short ushort;
 
-  stm32f4xx::ClockConfig const &clock_config;
+  stm32f4xx::ClockConfig const *clock_config;
 
   ushort line_pixels;
   ushort sync_pixels;

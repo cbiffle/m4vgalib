@@ -42,7 +42,7 @@ namespace vga {
 static constexpr unsigned max_pixels_per_line = 800;
 
 // The current mode, set by select_mode.
-static VideoMode const *current_mode;
+static VideoMode current_mode;
 
 // [0, current_mode.video_end_line).  Updated at front porch interrupt.
 static unsigned volatile current_line;
@@ -150,7 +150,7 @@ void select_mode(VideoMode const &mode) {
   // TODO: apply buffered changes.
 
   // Switch to new CPU clock settings.
-  rcc.configure_clocks(mode.clock_config);
+  rcc.configure_clocks(*mode.clock_config);
 
   // Configure TIM8 for horizontal sync generation.
   rcc.leave_reset(ApbPeripheral::tim8);
@@ -198,7 +198,7 @@ void select_mode(VideoMode const &mode) {
   scan_buffer[sizeof(scan_buffer) - 1] = 0;
 
   // Set up global state.
-  current_mode = &mode;  // TODO(cbiffle): copy into RAM for less jitter?
+  current_mode = mode;
   current_line = 0;
 
   // Start the timer.
@@ -219,7 +219,7 @@ extern "C" void stm32f4xx_tim8_cc_handler() {
   auto sr = tim8.read_sr();
   tim8.write_sr(sr.with_cc2if(false).with_cc3if(false));
 
-  vga::VideoMode const &mode = *vga::current_mode;
+  vga::VideoMode const &mode = vga::current_mode;
 
   if (sr.get_cc2if()) {
     // CC2 indicates start of active video (end of back porch).
@@ -364,6 +364,6 @@ void v7m_pend_sv_handler() {
                          static_cast<void *>(vga::scan_buffer)),
                      sizeof(vga::working_buffer) / 4);
 
-  rasterize(vga::current_line - vga::current_mode->video_start_line,
+  rasterize(vga::current_line - vga::current_mode.video_start_line,
             vga::working_buffer);
 }

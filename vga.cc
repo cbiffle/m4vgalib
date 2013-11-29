@@ -1,10 +1,12 @@
 #include "vga/vga.h"
 
+#include "lib/common/attribute_macros.h"
 #include "lib/armv7m/exceptions.h"
 
 #include "lib/stm32f4xx/adv_timer.h"
 #include "lib/stm32f4xx/ahb.h"
 #include "lib/stm32f4xx/apb.h"
+#include "lib/stm32f4xx/dma.h"
 #include "lib/stm32f4xx/gpio.h"
 #include "lib/stm32f4xx/interrupts.h"
 #include "lib/stm32f4xx/rcc.h"
@@ -12,14 +14,21 @@
 using stm32f4xx::AdvTimer;
 using stm32f4xx::AhbPeripheral;
 using stm32f4xx::ApbPeripheral;
+using stm32f4xx::Dma;
+using stm32f4xx::dma2;
 using stm32f4xx::Gpio;
 using stm32f4xx::gpioc;
 using stm32f4xx::gpioe;
 using stm32f4xx::Interrupt;
 using stm32f4xx::rcc;
 using stm32f4xx::tim8;
+using stm32f4xx::Word;
+
+#define IN_SCAN_RAM SECTION(".vga_scan_ram")
 
 namespace vga {
+
+static constexpr unsigned max_pixels_per_line = 800;
 
 static unsigned volatile current_line;
 static VideoMode const *current_mode;
@@ -46,6 +55,9 @@ inline bool is_rendered_state(State s) {
 }
 
 static State volatile state;
+
+ALIGNED(4) IN_SCAN_RAM
+static unsigned char scan_buffer[max_pixels_per_line + 4];
 
 void init() {
   // TODO(cbiffle): original code turned on I/O compensation.  Should we?
@@ -100,7 +112,8 @@ void select_mode(VideoMode const &mode) {
   rcc.enter_reset(ApbPeripheral::tim8);
   disable_irq(Interrupt::tim8_cc);
 
-  // TODO: wait for completion of DMA.
+  // Busy-wait for pending DMA to complete.
+  while (dma2.stream1.read_cr().get_en());
 
   // TODO: apply buffered changes.
 
@@ -141,9 +154,16 @@ void select_mode(VideoMode const &mode) {
     case VideoMode::Polarity::negative: gpioc.set  (1 << 7); break;
   }
 
-  // TODO: scribble scan buffer to help catch bugs.
-
-  // TODO: ensure final pixels are black.
+  // Scribble over scan buffer to help catch bugs.
+  for (unsigned i = 0; i < sizeof(scan_buffer) - 4; i += 2) {
+    scan_buffer[i] = 0xFF;
+    scan_buffer[i + 1] = 0x00;
+  }
+  // But the final four must be black.
+  scan_buffer[sizeof(scan_buffer) - 4] = 0;
+  scan_buffer[sizeof(scan_buffer) - 3] = 0;
+  scan_buffer[sizeof(scan_buffer) - 2] = 0;
+  scan_buffer[sizeof(scan_buffer) - 1] = 0;
 
   // Set up global state.
   current_mode = &mode;  // TODO(cbiffle): copy into RAM for less jitter?
@@ -164,23 +184,111 @@ extern "C" void stm32f4xx_tim8_cc_handler() {
   auto sr = tim8.read_sr();
   tim8.write_sr(sr.with_cc2if(false).with_cc3if(false));
 
+  vga::VideoMode const &mode = *vga::current_mode;
+
   if (sr.get_cc2if()) {
     // CC2 indicates start of active video.
-    // TODO(cbiffle): kick off DMA here.
-
-    // hack hack
+    // This only matters in displayed states.
     if (is_displayed_state(vga::state)) {
-      gpioe.set(0xFF00);
+      // Clear stream 1 flags (lifcr is a write-1-to-clear register).
+      dma2.write_lifcr(Dma::lifcr_value_t()
+                       .with_cdmeif1(true)
+                       .with_cteif1(true)
+                       .with_chtif1(true)
+                       .with_ctcif1(true));
+
+      auto &st = dma2.stream1;
+
+      // Shut off stream 1 by zeroing CR.
+      // TODO(cbiffle): necessary?
+      st.write_cr(Dma::Stream::cr_value_t());
+
+      // Prepare to transfer pixels as words, plus the final black word.
+      st.write_ndtr(mode.video_pixels / 4 + 1);
+
+      // Set addresses.  Note that we're using memory as the peripheral side.
+      // This DMA controller is a little odd.
+      st.write_par(reinterpret_cast<Word>(&vga::scan_buffer));
+      st.write_m0ar(0x40021015);  // High byte of GPIOE ODR (hack hack)
+
+      // Configure FIFO.
+      st.write_fcr(Dma::Stream::fcr_value_t()
+                   .with_fth(Dma::Stream::fcr_value_t::fth_t::quarter)
+                   .with_dmdis(true)
+                   .with_feie(false));
+
+      /*
+       * Configure and enable the DMA stream.  The configuration used here
+       * deserves more discussion.
+       *
+       * As noted above, our "peripheral" is RAM and our "memory" is the GPIO
+       * unit.  In memory-to-memory mode (which we use) the distinction is
+       * not useful, since the peripherals are memory-mapped; the controller
+       * insists that "peripheral" be source and "memory" be destination in that
+       * mode.  The key here is that the transfer runs at full speed.  On the
+       * STM32F407 the transfer will not exceed one unit per 4 AHB cycles.  The
+       * reason for this is not obvious.
+       *
+       * Address incrementation on this chip is independent from whether an
+       * address is considered "peripheral" or "memory."  Here we auto-increment
+       * the peripheral address (to walk through the scan buffer) while leaving
+       * the memory address fixed (at the appropriate byte of the GPIO port).
+       *
+       * Because we're using memory-to-memory, the hardware enforces several
+       * restrictions:
+       *
+       *  1. We're stuck using DMA2.  DMA1 can't do it.
+       *  2. We're required to use the FIFO -- direct mode is verboten.
+       *  3. We can't use circular mode.  (Double-buffer mode appears permitted,
+       *     but I haven't tried it.)
+       *
+       * Fortunately we can tie the FIFO to a tree by giving it a really low
+       * threshold level.
+       *
+       * I have not experimented with burst modes, but I suspect they'll make
+       * the timing less regular.
+       *
+       * Note that the priority (pl field) is only used for arbitration between
+       * streams of the same DMA controller.  The STM32F4 does not provide any
+       * control over the AHB matrix arbitration scheme, unlike (say) the NXP
+       * LPC1788.  Shame, that.  It means we have to be very careful about our
+       * use of the bus matrix during scan-out.
+       */
+      typedef Dma::Stream::cr_value_t cr_t;
+      st.write_cr(Dma::Stream::cr_value_t()
+                  // Originally chosen to play nice with TIM8.  Now, arbitrary.
+                  .with_chsel(7)
+                  .with_pl(cr_t::pl_t::very_high)
+                  .with_dir(cr_t::dir_t::memory_to_memory)
+                  // Input settings:
+                  .with_pburst(Dma::Stream::BurstSize::single)
+                  .with_psize(Dma::Stream::TransferSize::word)
+                  .with_pinc(true)
+                  // Output settings:
+                  .with_mburst(Dma::Stream::BurstSize::single)
+                  .with_msize(Dma::Stream::TransferSize::byte)
+                  .with_minc(false)
+                  // Look at all these options we don't use:
+                  .with_dbm(false)
+                  .with_pincos(false)
+                  .with_circ(false)
+                  .with_pfctrl(false)
+                  .with_tcie(false)
+                  .with_htie(false)
+                  .with_teie(false)
+                  .with_dmeie(false)
+                  // Finally, enable.
+                  .with_en(true));
+    } else {
+      // Not displayed state.  Ensure pins are black.
+      // TODO(cbiffle): almost certainly not necessary...
+      gpioe.clear(0xFF00);
     }
   }
 
   if (sr.get_cc3if()) {
     // CC3 indicates end of active video.
     unsigned line = vga::current_line;
-    vga::VideoMode const &mode = *vga::current_mode;
-
-    // hack hack
-    gpioe.clear(0xFF00);
 
     if (line == 0) {
       // Start of frame!  Time to stop displaying pixels.

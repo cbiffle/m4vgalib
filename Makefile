@@ -5,6 +5,8 @@ vga[type] := library
 
 vga[cc_files] := vga.cc
 
+vga[S_files] := copy_words.S
+
 vga[cc_flags] := -std=gnu++0x
 
 vga[libs] := \

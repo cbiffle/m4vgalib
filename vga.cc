@@ -1,7 +1,6 @@
 #include "vga/vga.h"
 
 #include "lib/common/attribute_macros.h"
-#include "lib/armv7m/copy_words.h"
 #include "lib/armv7m/exceptions.h"
 #include "lib/armv7m/exception_table.h"
 #include "lib/armv7m/scb.h"
@@ -15,6 +14,8 @@
 #include "lib/stm32f4xx/interrupts.h"
 #include "lib/stm32f4xx/rcc.h"
 #include "lib/stm32f4xx/syscfg.h"
+
+#include "vga/copy_words.h"
 
 using stm32f4xx::AdvTimer;
 using stm32f4xx::AhbPeripheral;
@@ -370,11 +371,11 @@ void v7m_pend_sv_handler() {
   // PendSV.
   // Note that GCC can't see that we've aligned the buffers correctly, so we
   // have to do a multi-cast dance. :-/
-  armv7m::copy_words(reinterpret_cast<Word const *>(
-                         static_cast<void *>(vga::working_buffer)),
-                     reinterpret_cast<Word *>(
-                         static_cast<void *>(vga::scan_buffer)),
-                     sizeof(vga::working_buffer) / 4);
+  copy_words(reinterpret_cast<Word const *>(
+                 static_cast<void *>(vga::working_buffer)),
+             reinterpret_cast<Word *>(
+                 static_cast<void *>(vga::scan_buffer)),
+             sizeof(vga::working_buffer) / 4);
 
   rasterize(vga::current_line - vga::current_mode.video_start_line,
             vga::working_buffer);

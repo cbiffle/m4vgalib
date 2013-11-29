@@ -222,10 +222,6 @@ extern "C" void stm32f4xx_tim8_cc_handler() {
 
       auto &st = dma2.stream1;
 
-      // Shut off stream 1 by zeroing CR.
-      // TODO(cbiffle): necessary?
-      st.write_cr(Dma::Stream::cr_value_t());
-
       // Prepare to transfer pixels as words, plus the final black word.
       st.write_ndtr(mode.video_pixels / 4 + 1);
 
@@ -302,10 +298,6 @@ extern "C" void stm32f4xx_tim8_cc_handler() {
                   .with_dmeie(false)
                   // Finally, enable.
                   .with_en(true));
-    } else {
-      // Not displayed state.  Ensure pins are black.
-      // TODO(cbiffle): almost certainly not necessary...
-      gpioe.clear(0xFF00);
     }
   }
 
@@ -316,7 +308,6 @@ extern "C" void stm32f4xx_tim8_cc_handler() {
     if (line == 0) {
       // Start of frame!  Time to stop displaying pixels.
       vga::state = vga::State::blank;
-      // TODO(cbiffle): suppress video output.
       // TODO(cbiffle): latch configuration changes.
     } else if (line == mode.vsync_start_line
             || line == mode.vsync_end_line) {

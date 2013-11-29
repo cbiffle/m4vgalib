@@ -21,6 +21,9 @@ using stm32f4xx::tim8;
 
 namespace vga {
 
+static unsigned volatile current_line;
+static VideoMode const *current_mode;
+
 void init() {
   // TODO(cbiffle): original code turned on I/O compensation.  Should we?
 
@@ -119,6 +122,10 @@ void select_mode(VideoMode const &mode) {
 
   // TODO: ensure final pixels are black.
 
+  // Set up global state.
+  current_mode = &mode;  // TODO(cbiffle): copy into RAM for less jitter?
+  current_line = 0;
+
   // Start the timer.
   enable_irq(Interrupt::tim8_cc);
   tim8.write_cr1(tim8.read_cr1().with_cen(true));
@@ -128,3 +135,43 @@ void select_mode(VideoMode const &mode) {
 }
 
 }  // namespace vga
+
+extern "C" void stm32f4xx_tim8_cc_handler() {
+  // We have to clear our interrupt flags, or this will recur.
+  auto sr = tim8.read_sr();
+  tim8.write_sr(sr.with_cc2if(false).with_cc3if(false));
+
+  if (sr.get_cc2if()) {
+    // CC2 indicates start of active video.
+    // TODO(cbiffle): kick off DMA here.
+  }
+
+  if (sr.get_cc3if()) {
+    // CC3 indicates end of active video.
+    unsigned line = vga::current_line;
+    vga::VideoMode const &mode = *vga::current_mode;
+
+    if (line == 0) {
+      // Start of frame!  Time to stop displaying pixels.
+      // TODO(cbiffle): suppress video output.
+      // TODO(cbiffle): latch configuration changes.
+    } else if (line == mode.vsync_start_line
+            || line == mode.vsync_end_line) {
+      // Either edge of vsync pulse.
+      gpioc.toggle(Gpio::p7);
+    } else if (line == static_cast<unsigned short>(mode.video_start_line - 1)) {
+      // Time to start generating the first scan buffer.
+      // TODO(cbiffle): kick that off somehow.
+    } else if (line == mode.video_start_line) {
+      // Time to start output.
+      // TODO(cbiffle): record that in a way that CC2 will notice later.
+    } else if (line == static_cast<unsigned short>(mode.video_end_line - 1)) {
+      // Time to stop rendering new scan buffers.
+      // TODO(cbiffle): stop whatever you did to start this.
+      line = static_cast<unsigned>(-1);  // Make line roll over to zero.
+    }
+
+    vga::current_line = line + 1;
+  }
+}
+

@@ -30,7 +30,7 @@ struct VideoMode {
   ushort vsync_start_line;
   ushort vsync_end_line;
   ushort video_start_line;
-  ushort video_line_count;
+  ushort video_end_line;
   Polarity vsync_polarity;
 };
 

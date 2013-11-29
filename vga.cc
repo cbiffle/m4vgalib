@@ -1,7 +1,10 @@
 #include "vga/vga.h"
 
 #include "lib/common/attribute_macros.h"
+#include "lib/armv7m/copy_words.h"
 #include "lib/armv7m/exceptions.h"
+#include "lib/armv7m/exception_table.h"
+#include "lib/armv7m/scb.h"
 
 #include "lib/stm32f4xx/adv_timer.h"
 #include "lib/stm32f4xx/ahb.h"
@@ -27,6 +30,7 @@ using stm32f4xx::tim8;
 using stm32f4xx::Word;
 
 #define IN_SCAN_RAM SECTION(".vga_scan_ram")
+#define IN_LOCAL_RAM SECTION(".vga_local_ram")
 
 namespace vga {
 
@@ -68,8 +72,16 @@ inline bool is_rendered_state(State s) {
 static State volatile state;
 
 // This is the DMA source for scan-out, filled during pend_sv.
+// It's aligned for DMA.
+// It contains four trailing pixels that are kept black for blanking.
 ALIGNED(4) IN_SCAN_RAM
 static unsigned char scan_buffer[max_pixels_per_line + 4];
+
+// This is the intermediate buffer used during rasterization.
+// It should be close to the CPU and need not be DMA-capable.
+// It's aligned to make copying it more efficient.
+ALIGNED(4) IN_LOCAL_RAM
+static unsigned char working_buffer[max_pixels_per_line];
 
 
 /*******************************************************************************
@@ -174,12 +186,12 @@ void select_mode(VideoMode const &mode) {
     case VideoMode::Polarity::negative: gpioc.set  (1 << 7); break;
   }
 
-  // Scribble over scan buffer to help catch bugs.
-  for (unsigned i = 0; i < sizeof(scan_buffer) - 4; i += 2) {
-    scan_buffer[i] = 0xFF;
-    scan_buffer[i + 1] = 0x00;
+  // Scribble over working buffer to help catch bugs.
+  for (unsigned i = 0; i < sizeof(working_buffer); i += 2) {
+    working_buffer[i] = 0xFF;
+    working_buffer[i + 1] = 0x00;
   }
-  // But the final four must be black.
+  // Blank the final four pixels of the scan buffer.
   scan_buffer[sizeof(scan_buffer) - 4] = 0;
   scan_buffer[sizeof(scan_buffer) - 3] = 0;
   scan_buffer[sizeof(scan_buffer) - 2] = 0;
@@ -328,8 +340,23 @@ extern "C" void stm32f4xx_tim8_cc_handler() {
     vga::current_line = line + 1;
 
     if (is_rendered_state(vga::state)) {
-      // TODO(cbiffle): PendSV to kick off a buffer flip and rasterization.
+      // Pend a PendSV to rasterize.
+      armv7m::scb.write_icsr(armv7m::scb.read_icsr().with_pendsvset(true));
     }
   }
 }
 
+void v7m_pend_sv_handler() {
+  // Flip working_buffer into scan_buffer.
+  // We know its contents are ready because otherwise we wouldn't take a new
+  // PendSV.
+  // Note that GCC can't see that we've aligned the buffers correctly, so we
+  // have to do a multi-cast dance. :-/
+  armv7m::copy_words(reinterpret_cast<Word const *>(
+                         static_cast<void *>(vga::working_buffer)),
+                     reinterpret_cast<Word *>(
+                         static_cast<void *>(vga::scan_buffer)),
+                     sizeof(vga::working_buffer) / 4);
+
+  // TODO(cbiffle): now produce a new working buffer.
+}

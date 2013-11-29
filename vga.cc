@@ -88,7 +88,8 @@ void select_mode(VideoMode const &mode) {
   tim8.write_arr(mode.line_pixels - 1);
   tim8.write_ccr1(mode.sync_pixels);
   tim8.write_ccr2(mode.sync_pixels + mode.back_porch_pixels - mode.video_lead);
-  tim8.write_ccr3(mode.sync_pixels + mode.back_porch_pixels + mode.video_lead);
+  tim8.write_ccr3(
+      mode.sync_pixels + mode.back_porch_pixels + mode.video_pixels);
 
   tim8.write_ccmr1(AdvTimer::ccmr1_value_t()
                    .with_oc1m(AdvTimer::OcMode::pwm1)

@@ -5,6 +5,8 @@ namespace vga {
 
 void init();
 
+void video_off();
+
 }  // namespace vga
 
 #endif  // VGA_VGA_H

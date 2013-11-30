@@ -52,6 +52,9 @@ static VideoMode current_mode;
 // [0, current_mode.video_end_line).  Updated at front porch interrupt.
 static unsigned volatile current_line;
 
+// Free-running counter, incremented at the start of each vblank interval.
+static unsigned volatile current_frame;
+
 /*
  * The vertical timing state.  This is a Gray code and the bits have meaning.
  * See the inspector functions below.
@@ -331,6 +334,7 @@ RAM_CODE void stm32f4xx_tim8_cc_handler() {
     if (line == 0) {
       // Start of frame!  Time to stop displaying pixels.
       vga::state = vga::State::blank;
+      ++vga::current_frame;
       // TODO(cbiffle): latch configuration changes.
     } else if (line == mode.vsync_start_line
             || line == mode.vsync_end_line) {
@@ -352,15 +356,22 @@ RAM_CODE void stm32f4xx_tim8_cc_handler() {
 
     if (is_rendered_state(vga::state)) {
       // Pend a PendSV to rasterize.
-      armv7m::scb.write_icsr(armv7m::scb.read_icsr().with_pendsvset(true));
+      armv7m::scb.write_icsr(armv7m::Scb::icsr_value_t().with_pendsvset(true));
     }
   }
 }
 
 RAM_CODE
 static void rasterize(unsigned line, unsigned char *buf) {
-  for (unsigned i = 0; i < 800; ++i) {
-    buf[i] = (line >> 2) ^ (i >> 2);
+  unsigned f = vga::current_frame;
+  unsigned col = 0;
+  unsigned char *end = buf + 800;
+  while (buf != end) {
+    *buf++ = ((line >> 2) + f) ^ col;
+    *buf++ = ((line >> 2) + f) ^ col;
+    *buf++ = ((line >> 2) + f) ^ col;
+    *buf++ = ((line >> 2) + f) ^ col;
+    ++col;
   }
 }
 

@@ -259,6 +259,14 @@ void select_mode(Mode *mode) {
   video_on();
 }
 
+void wait_for_vblank() {
+  while (!in_vblank());
+}
+
+bool in_vblank() {
+  return current_line < current_mode->get_timing().video_start_line;
+}
+
 }  // namespace vga
 
 /*******************************************************************************

@@ -12,6 +12,10 @@ void video_off();
 
 void select_mode(Mode *);
 
+void wait_for_vblank();
+
+bool in_vblank();
+
 }  // namespace vga
 
 #endif  // VGA_VGA_H

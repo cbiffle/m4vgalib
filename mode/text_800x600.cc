@@ -5,6 +5,7 @@
 #include "vga/unpack_text_10p_attributed.h"
 
 #include "vga/font_10x16.h"
+#include "vga/vga.h"
 
 namespace vga {
 namespace mode {
@@ -45,6 +46,7 @@ static Timing timing = {
 };
 
 void Text_800x600::activate() {
+  _insertion_pos = 0;
   _font = new unsigned char[4096];
   _framebuffer = new unsigned[cols * rows];
 
@@ -64,6 +66,11 @@ void Text_800x600::activate() {
   }
 }
 
+void Text_800x600::deactivate() {
+  _framebuffer = nullptr;
+  _font = nullptr;
+}
+
 __attribute__((section(".ramcode")))
 void Text_800x600::rasterize(unsigned line_number, Pixel *target) {
   line_number -= timing.video_start_line;
@@ -80,6 +87,39 @@ void Text_800x600::rasterize(unsigned line_number, Pixel *target) {
 __attribute__((section(".ramcode")))
 Timing const &Text_800x600::get_timing() const {
   return timing;
+}
+
+void Text_800x600::clear_framebuffer(Pixel bg) {
+  unsigned word = bg << 8 | ' ';
+  for (unsigned i = 0; i < cols * rows; ++i) {
+    _framebuffer[i] = word;
+  }
+}
+
+void Text_800x600::type_char_raw(Pixel fore, Pixel back, char c) {
+  wait_for_vblank();
+  if (_insertion_pos == cols * rows) _insertion_pos = 0;
+  _framebuffer[_insertion_pos++] = (fore << 16) | (back << 8) | c;
+}
+
+void Text_800x600::type_char(Pixel fore, Pixel back, char c) {
+  switch (c) {
+    case '\n':
+      do {
+        type_char_raw(fore, back, ' ');
+      } while (_insertion_pos % cols);
+      break;
+
+    default:
+      type_char_raw(fore, back, c);
+      break;
+  }
+}
+
+void Text_800x600::type_chars(Pixel fore, Pixel back, char const *str) {
+  while (char c = *str++) {
+    type_char(fore, back, c);
+  }
 }
 
 }  // namespace mode

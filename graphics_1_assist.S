@@ -6,9 +6,9 @@
 @  r0  Graphics1 pointer
 @  r1  x coordinate
 @  r2  y coordinate
-.global _ZN3vga9Graphics19set_pixelEjj
+.global _ZN3vga9Graphics116set_pixel_assistEjj
 .thumb_func
-_ZN3vga9Graphics19set_pixelEjj:
+_ZN3vga9Graphics116set_pixel_assistEjj:
       push {lr}
       ldr lr, [r0, #12]         @ Load stride.
       ldr r0, [r0, #0]          @ Load framebuffer.
@@ -34,9 +34,9 @@ _ZN3vga9Graphics19set_pixelEjj:
 @  r0  Graphics1 pointer
 @  r1  x coordinate
 @  r2  y coordinate
-.global _ZN3vga9Graphics111clear_pixelEjj
+.global _ZN3vga9Graphics118clear_pixel_assistEjj
 .thumb_func
-_ZN3vga9Graphics111clear_pixelEjj:
+_ZN3vga9Graphics118clear_pixel_assistEjj:
       push {lr}
       ldr lr, [r0, #12]         @ Load stride.
       ldr r0, [r0, #0]          @ Load framebuffer.

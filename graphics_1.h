@@ -18,6 +18,9 @@ private:
   unsigned _width_px;
   unsigned _height_px;
   unsigned _stride_words;
+
+  void set_pixel_assist(unsigned, unsigned);
+  void clear_pixel_assist(unsigned, unsigned);
 };
 
 }  // namespace vga

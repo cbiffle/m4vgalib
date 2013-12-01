@@ -13,10 +13,12 @@ public:
   virtual void rasterize(unsigned line_number, Pixel *target);
   virtual Timing const &get_timing() const;
 
-  Graphics1 make_graphics() const;
+  Graphics1 make_bg_graphics() const;
+  void flip();
 
 private:
-  unsigned char *_framebuffer;
+  unsigned char *_framebuffer[2];
+  bool _page1;
   Pixel _clut[2];
 };
 

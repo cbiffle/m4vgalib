@@ -11,7 +11,7 @@ namespace vga {
 namespace mode {
 
 static constexpr unsigned cols = 800 / 10;
-static constexpr unsigned rows = 600 / 16;
+static constexpr unsigned rows = (600 + 15) / 16;
 
 static stm32f4xx::ClockConfig const clock_cfg = {
   8000000,  // external crystal Hz
@@ -56,13 +56,8 @@ void Text_800x600::activate() {
     _font[i] = font_10x16[i];
   }
 
-  for (unsigned y = 0; y < rows; ++y) {
-    for (unsigned x = 0; x < cols; ++x) {
-      unsigned i = y * cols + x;
-      _framebuffer[i] = ((y & 0xFF) << 16)
-                      | ((x & 0xFF) << 8)
-                      | (i & 0xFF);
-    }
+  for (unsigned i = 0; i < cols * rows; ++i) {
+    _framebuffer[i] = 0;
   }
 }
 
@@ -120,6 +115,13 @@ void Text_800x600::type_chars(Pixel fore, Pixel back, char const *str) {
   while (char c = *str++) {
     type_char(fore, back, c);
   }
+}
+
+void Text_800x600::cursor_to(unsigned col, unsigned row) {
+  if (col >= cols) col = cols - 1;
+  if (row >= rows) row = rows - 1;
+
+  _insertion_pos = row * cols + col;
 }
 
 }  // namespace mode

@@ -17,6 +17,7 @@ public:
   void type_char_raw(Pixel fore, Pixel back, char);
   void type_char(Pixel fore, Pixel back, char);
   void type_chars(Pixel fore, Pixel back, char const *);
+  void cursor_to(unsigned col, unsigned row);
 
 private:
   unsigned *_framebuffer;

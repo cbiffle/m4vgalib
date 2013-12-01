@@ -52,8 +52,8 @@ void Raster_800x600x1::activate() {
   _clut[1] = 0xFF;
 
   for (unsigned i = 0; i < fb_stride * rows; ++i) {
-    _framebuffer[0][i] = 0xAA;
-    _framebuffer[1][i] = 0xAA;
+    _framebuffer[0][i] = 0x00;
+    _framebuffer[1][i] = 0x00;
   }
 }
 
@@ -78,6 +78,14 @@ Graphics1 Raster_800x600x1::make_bg_graphics() const {
 void Raster_800x600x1::flip() {
   vga::wait_for_vblank();
   _page1 = !_page1;
+}
+
+void Raster_800x600x1::set_fg_color(Pixel c) {
+  _clut[1] = c;
+}
+
+void Raster_800x600x1::set_bg_color(Pixel c) {
+  _clut[0] = c;
 }
 
 }  // namespace mode

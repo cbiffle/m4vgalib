@@ -264,6 +264,11 @@ bool in_vblank() {
   return current_line < current_mode->get_timing().video_start_line;
 }
 
+void sync_to_vblank() {
+  while (in_vblank());
+  wait_for_vblank();
+}
+
 }  // namespace vga
 
 /*******************************************************************************

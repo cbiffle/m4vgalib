@@ -16,6 +16,8 @@ void wait_for_vblank();
 
 bool in_vblank();
 
+void sync_to_vblank();
+
 }  // namespace vga
 
 #endif  // VGA_VGA_H

@@ -16,6 +16,9 @@ public:
   Graphics1 make_bg_graphics() const;
   void flip();
 
+  void set_fg_color(Pixel);
+  void set_bg_color(Pixel);
+
 private:
   unsigned char *_framebuffer[2];
   bool _page1;

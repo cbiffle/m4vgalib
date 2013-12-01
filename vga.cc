@@ -57,9 +57,6 @@ static Mode *current_mode;
 // [0, current_mode.video_end_line).  Updated at front porch interrupt.
 static unsigned volatile current_line;
 
-// Free-running counter, incremented at the start of each vblank interval.
-static unsigned volatile current_frame;
-
 /*
  * The vertical timing state.  This is a Gray code and the bits have meaning.
  * See the inspector functions below.
@@ -379,7 +376,7 @@ RAM_CODE void stm32f4xx_tim8_cc_handler() {
     if (line == 0) {
       // Start of frame!  Time to stop displaying pixels.
       vga::state = vga::State::blank;
-      ++vga::current_frame;
+      mode.top_of_frame();
       // TODO(cbiffle): latch configuration changes.
     } else if (line == timing.vsync_start_line
             || line == timing.vsync_end_line) {

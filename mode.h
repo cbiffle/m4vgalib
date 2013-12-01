@@ -37,6 +37,12 @@ public:
    * rarely be necessary, so the default implementation just returns.
    */
   virtual void deactivate();
+
+  /*
+   * Take any action required at the top of each frame.  The default
+   * implementation does nothing.
+   */
+  virtual void top_of_frame();
 };
 
 }  // namespace vga

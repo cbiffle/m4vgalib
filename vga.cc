@@ -45,6 +45,9 @@ namespace vga {
  * Driver state and configuration.
  */
 
+// Controls performance monitoring output on PC9.
+static constexpr bool perf_out = true;
+
 // Used to adjust size of scan_buffer, below.
 static constexpr unsigned max_pixels_per_line = 800;
 
@@ -93,6 +96,24 @@ static unsigned char scan_buffer[max_pixels_per_line + 4];
 ALIGNED(4) IN_LOCAL_RAM
 static unsigned char working_buffer[max_pixels_per_line];
 
+
+static INLINE void perf_tog() {
+  if (perf_out) {
+    gpioc.toggle(Gpio::p9);
+  }
+}
+
+static INLINE void perf_clear() {
+  if (perf_out) {
+    gpioc.clear(Gpio::p9);
+  }
+}
+
+static INLINE void perf_set() {
+  if (perf_out) {
+    gpioc.set(Gpio::p9);
+  }
+}
 
 /*******************************************************************************
  * Driver API.
@@ -144,6 +165,12 @@ void video_on() {
   gpioe.set_output_type(0xFF00, Gpio::OutputType::push_pull);
   gpioe.set_output_speed(0xFF00, Gpio::OutputSpeed::high_100mhz);
   gpioe.set_mode(0xFF00, Gpio::Mode::gpio);
+
+  if (perf_out) {
+    gpioc.set_output_type(Gpio::p9, Gpio::OutputType::push_pull);
+    gpioc.set_output_speed(Gpio::p9, Gpio::OutputSpeed::high_100mhz);
+    gpioc.set_mode(Gpio::p9, Gpio::Mode::gpio);
+  }
 }
 
 void select_mode(Mode *mode) {

@@ -2,6 +2,7 @@
 #define VGA_MODE_RASTER_800X600X1_H
 
 #include "vga/mode.h"
+#include "vga/graphics_1.h"
 
 namespace vga {
 namespace mode {
@@ -11,6 +12,8 @@ public:
   virtual void activate();
   virtual void rasterize(unsigned line_number, Pixel *target);
   virtual Timing const &get_timing() const;
+
+  Graphics1 make_graphics() const;
 
 private:
   unsigned char *_framebuffer;

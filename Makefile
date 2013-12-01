@@ -6,6 +6,7 @@ vga[type] := library
 vga[cc_files] := \
   arena.cc \
   font_10x16.cc \
+  graphics_1.cc \
   mode.cc \
   vga.cc \
   mode/raster_640x480x1.cc \
@@ -14,6 +15,7 @@ vga[cc_files] := \
 
 vga[S_files] := \
   copy_words.S \
+  graphics_1_assist.S \
   unpack_1bpp.S \
   unpack_text_10p_attributed.S
 

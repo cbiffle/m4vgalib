@@ -44,7 +44,7 @@ static Timing timing = {
 };
 
 void Raster_800x600x1::activate() {
-  _framebuffer = new Pixel[fb_stride * rows];
+  _framebuffer = new unsigned char[fb_stride * rows];
   _clut[0] = 0;
   _clut[1] = 0xFF;
 
@@ -65,6 +65,10 @@ void Raster_800x600x1::rasterize(unsigned line_number, Pixel *target) {
 __attribute__((section(".ramcode")))
 Timing const &Raster_800x600x1::get_timing() const {
   return timing;
+}
+
+Graphics1 Raster_800x600x1::make_graphics() const {
+  return Graphics1(_framebuffer, 800, 600, 800 / 32);
 }
 
 }  // namespace mode

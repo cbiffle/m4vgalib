@@ -361,18 +361,21 @@ RAM_CODE void stm32f4xx_tim8_cc_handler() {
   }
 }
 
+static unsigned char const clut[2] = { 0, 0xFF };
+
+extern "C" {
+  extern void unpack_1bpp_impl(void const *,
+                               void const *,
+                               void *,
+                               unsigned);
+}
+
 RAM_CODE
 static void rasterize(unsigned line, unsigned char *buf) {
-  unsigned f = vga::current_frame;
-  unsigned col = 0;
-  unsigned char *end = buf + 800;
-  while (buf != end) {
-    *buf++ = ((line >> 2) + f) ^ col;
-    *buf++ = ((line >> 2) + f) ^ col;
-    *buf++ = ((line >> 2) + f) ^ col;
-    *buf++ = ((line >> 2) + f) ^ col;
-    ++col;
-  }
+  unsigned char const *src =
+      reinterpret_cast<unsigned char const *>(line * 100);
+
+  unpack_1bpp_impl(src, &clut, buf, 100);
 }
 
 RAM_CODE

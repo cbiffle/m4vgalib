@@ -3,7 +3,11 @@ products := vga
 
 vga[type] := library
 
-vga[cc_files] := vga.cc
+vga[cc_files] := \
+  arena.cc \
+  mode.cc \
+  vga.cc \
+  mode/raster_800x600x1.cc
 
 vga[S_files] := \
   copy_words.S \

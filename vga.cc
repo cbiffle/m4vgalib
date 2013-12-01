@@ -15,7 +15,9 @@
 #include "lib/stm32f4xx/rcc.h"
 #include "lib/stm32f4xx/syscfg.h"
 
+#include "vga/arena.h"
 #include "vga/copy_words.h"
+#include "vga/timing.h"
 
 using stm32f4xx::AdvTimer;
 using stm32f4xx::AhbPeripheral;
@@ -47,7 +49,7 @@ namespace vga {
 static constexpr unsigned max_pixels_per_line = 800;
 
 // The current mode, set by select_mode.
-static VideoMode current_mode;
+static Mode *current_mode;
 
 // [0, current_mode.video_end_line).  Updated at front porch interrupt.
 static unsigned volatile current_line;
@@ -144,7 +146,7 @@ void video_on() {
   gpioe.set_mode(0xFF00, Gpio::Mode::gpio);
 }
 
-void select_mode(VideoMode const &mode) {
+void select_mode(Mode *mode) {
   // Disable outputs during mode change.
   video_off();
 
@@ -155,10 +157,15 @@ void select_mode(VideoMode const &mode) {
   // Busy-wait for pending DMA to complete.
   while (dma2.stream1.read_cr().get_en());
 
-  // TODO: apply buffered changes.
+  if (current_mode) current_mode->deactivate();
+
+  arena_reset();
+
+  mode->activate();
+  Timing const &timing = mode->get_timing();
 
   // Switch to new CPU clock settings.
-  rcc.configure_clocks(*mode.clock_config);
+  rcc.configure_clocks(*timing.clock_config);
 
   // Enable Flash cache and prefetching to try and reduce jitter.
   flash.write_acr(flash.read_acr()
@@ -170,11 +177,12 @@ void select_mode(VideoMode const &mode) {
   rcc.leave_reset(ApbPeripheral::tim8);
   tim8.write_psc(4 - 1);  // Count in pixels, 1 pixel = 4 CCLK
 
-  tim8.write_arr(mode.line_pixels - 1);
-  tim8.write_ccr1(mode.sync_pixels);
-  tim8.write_ccr2(mode.sync_pixels + mode.back_porch_pixels - mode.video_lead);
-  tim8.write_ccr3(
-      mode.sync_pixels + mode.back_porch_pixels + mode.video_pixels);
+  tim8.write_arr(timing.line_pixels - 1);
+  tim8.write_ccr1(timing.sync_pixels);
+  tim8.write_ccr2(timing.sync_pixels
+                  + timing.back_porch_pixels - timing.video_lead);
+  tim8.write_ccr3(timing.sync_pixels
+                  + timing.back_porch_pixels + timing.video_pixels);
 
   tim8.write_ccmr1(AdvTimer::ccmr1_value_t()
                    .with_oc1m(AdvTimer::OcMode::pwm1)
@@ -187,7 +195,7 @@ void select_mode(VideoMode const &mode) {
   tim8.write_ccer(AdvTimer::ccer_value_t()
                   .with_cc1e(true)
                   .with_cc1p(
-                      mode.hsync_polarity == VideoMode::Polarity::negative));
+                      timing.hsync_polarity == Timing::Polarity::negative));
 
   tim8.write_dier(AdvTimer::dier_value_t()
                   .with_cc2ie(true)    // Interrupt at start of active video.
@@ -195,9 +203,9 @@ void select_mode(VideoMode const &mode) {
 
   // Note: TIM8 is still not running.
 
-  switch (mode.vsync_polarity) {
-    case VideoMode::Polarity::positive: gpioc.clear(1 << 7); break;
-    case VideoMode::Polarity::negative: gpioc.set  (1 << 7); break;
+  switch (timing.vsync_polarity) {
+    case Timing::Polarity::positive: gpioc.clear(1 << 7); break;
+    case Timing::Polarity::negative: gpioc.set  (1 << 7); break;
   }
 
   // Scribble over working buffer to help catch bugs.
@@ -233,7 +241,8 @@ RAM_CODE void stm32f4xx_tim8_cc_handler() {
   auto sr = tim8.read_sr();
   tim8.write_sr(sr.with_cc2if(false).with_cc3if(false));
 
-  vga::VideoMode const &mode = vga::current_mode;
+  vga::Mode &mode = *vga::current_mode;
+  vga::Timing const &timing = mode.get_timing();
 
   if (sr.get_cc2if()) {
     // CC2 indicates start of active video (end of back porch).
@@ -249,7 +258,7 @@ RAM_CODE void stm32f4xx_tim8_cc_handler() {
       auto &st = dma2.stream1;
 
       // Prepare to transfer pixels as words, plus the final black word.
-      st.write_ndtr(mode.video_pixels / 4 + 1);
+      st.write_ndtr(timing.video_pixels / 4 + 1);
 
       // Set addresses.  Note that we're using memory as the peripheral side.
       // This DMA controller is a little odd.
@@ -336,17 +345,18 @@ RAM_CODE void stm32f4xx_tim8_cc_handler() {
       vga::state = vga::State::blank;
       ++vga::current_frame;
       // TODO(cbiffle): latch configuration changes.
-    } else if (line == mode.vsync_start_line
-            || line == mode.vsync_end_line) {
+    } else if (line == timing.vsync_start_line
+            || line == timing.vsync_end_line) {
       // Either edge of vsync pulse.
       gpioc.toggle(Gpio::p7);
-    } else if (line == static_cast<unsigned short>(mode.video_start_line - 1)) {
+    } else if (line ==
+                    static_cast<unsigned short>(timing.video_start_line - 1)) {
       // Time to start generating the first scan buffer.
       vga::state = vga::State::starting;
-    } else if (line == mode.video_start_line) {
+    } else if (line == timing.video_start_line) {
       // Time to start output.
       vga::state = vga::State::active;
-    } else if (line == static_cast<unsigned short>(mode.video_end_line - 1)) {
+    } else if (line == static_cast<unsigned short>(timing.video_end_line - 1)) {
       // Time to stop rendering new scan buffers.
       vga::state = vga::State::finishing;
       line = static_cast<unsigned>(-1);  // Make line roll over to zero.
@@ -359,23 +369,6 @@ RAM_CODE void stm32f4xx_tim8_cc_handler() {
       armv7m::scb.write_icsr(armv7m::Scb::icsr_value_t().with_pendsvset(true));
     }
   }
-}
-
-static unsigned char const clut[2] = { 0, 0xFF };
-
-extern "C" {
-  extern void unpack_1bpp_impl(void const *,
-                               void const *,
-                               void *,
-                               unsigned);
-}
-
-RAM_CODE
-static void rasterize(unsigned line, unsigned char *buf) {
-  unsigned char const *src =
-      reinterpret_cast<unsigned char const *>(line * 100);
-
-  unpack_1bpp_impl(src, &clut, buf, 100);
 }
 
 RAM_CODE
@@ -391,6 +384,5 @@ void v7m_pend_sv_handler() {
                  static_cast<void *>(vga::scan_buffer)),
              sizeof(vga::working_buffer) / 4);
 
-  rasterize(vga::current_line - vga::current_mode.video_start_line,
-            vga::working_buffer);
+  vga::current_mode->rasterize(vga::current_line, vga::working_buffer);
 }

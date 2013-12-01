@@ -2,10 +2,7 @@
 
 #include "lib/stm32f4xx/rcc.h"
 #include "vga/timing.h"
-
-extern "C" {
-  extern void unpack_1bpp_impl(void const *, void const *, void *, unsigned);
-}
+#include "vga/unpack_1bpp.h"
 
 namespace vga {
 namespace mode {

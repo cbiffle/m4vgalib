@@ -46,7 +46,6 @@ static Timing timing = {
 };
 
 void Text_800x600::activate() {
-  _insertion_pos = 0;
   _font = new unsigned char[4096];
   _framebuffer = new unsigned[cols * rows];
 
@@ -54,10 +53,6 @@ void Text_800x600::activate() {
   // and also saves 96 cycles per line.  (Actually a surprisingly low number.)
   for (unsigned i = 0; i < 4096; ++i) {
     _font[i] = font_10x16[i];
-  }
-
-  for (unsigned i = 0; i < cols * rows; ++i) {
-    _framebuffer[i] = 0;
   }
 }
 
@@ -91,37 +86,10 @@ void Text_800x600::clear_framebuffer(Pixel bg) {
   }
 }
 
-void Text_800x600::type_char_raw(Pixel fore, Pixel back, char c) {
+void Text_800x600::put_char(unsigned col, unsigned row,
+                            Pixel fore, Pixel back, char c) {
   wait_for_vblank();
-  if (_insertion_pos == cols * rows) _insertion_pos = 0;
-  _framebuffer[_insertion_pos++] = (fore << 16) | (back << 8) | c;
-}
-
-void Text_800x600::type_char(Pixel fore, Pixel back, char c) {
-  switch (c) {
-    case '\n':
-      do {
-        type_char_raw(fore, back, ' ');
-      } while (_insertion_pos % cols);
-      break;
-
-    default:
-      type_char_raw(fore, back, c);
-      break;
-  }
-}
-
-void Text_800x600::type_chars(Pixel fore, Pixel back, char const *str) {
-  while (char c = *str++) {
-    type_char(fore, back, c);
-  }
-}
-
-void Text_800x600::cursor_to(unsigned col, unsigned row) {
-  if (col >= cols) col = cols - 1;
-  if (row >= rows) row = rows - 1;
-
-  _insertion_pos = row * cols + col;
+  _framebuffer[row * cols + col] = (fore << 16) | (back << 8) | c;
 }
 
 }  // namespace mode

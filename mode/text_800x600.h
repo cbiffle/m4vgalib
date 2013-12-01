@@ -14,15 +14,11 @@ public:
   virtual Timing const &get_timing() const;
 
   void clear_framebuffer(Pixel);
-  void type_char_raw(Pixel fore, Pixel back, char);
-  void type_char(Pixel fore, Pixel back, char);
-  void type_chars(Pixel fore, Pixel back, char const *);
-  void cursor_to(unsigned col, unsigned row);
+  void put_char(unsigned col, unsigned row, Pixel fore, Pixel back, char);
 
 private:
   unsigned *_framebuffer;
   unsigned char *_font;
-  unsigned _insertion_pos;
 };
 
 }  // namespace mode

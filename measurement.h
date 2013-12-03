@@ -2,6 +2,7 @@
 #define VGA_MEASUREMENT_H
 
 #include "lib/common/attribute_macros.h"
+#include "lib/armv7m/sys_tick.h"
 #include "lib/stm32f4xx/gpio.h"
 
 namespace vga {
@@ -18,6 +19,12 @@ INLINE void msig_a_clear() {
 
 INLINE void msig_a_toggle() {
   stm32f4xx::gpioc.toggle(stm32f4xx::Gpio::p9);
+}
+
+void mtim_init();
+
+INLINE unsigned mtim_get() {
+  return armv7m::sys_tick.read_cvr().get_current();
 }
 
 }  // namespace vga

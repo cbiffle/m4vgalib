@@ -88,7 +88,6 @@ void Text_800x600::clear_framebuffer(Pixel bg) {
 
 void Text_800x600::put_char(unsigned col, unsigned row,
                             Pixel fore, Pixel back, char c) {
-  wait_for_vblank();
   _framebuffer[row * cols + col] = (fore << 16) | (back << 8) | c;
 }
 

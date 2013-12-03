@@ -18,6 +18,7 @@
 #include "vga/arena.h"
 #include "vga/copy_words.h"
 #include "vga/timing.h"
+#include "vga/measurement.h"
 
 using stm32f4xx::AdvTimer;
 using stm32f4xx::AhbPeripheral;
@@ -44,9 +45,6 @@ namespace vga {
 /*******************************************************************************
  * Driver state and configuration.
  */
-
-// Controls performance monitoring output on PC9.
-static constexpr bool perf_out = true;
 
 // Used to adjust size of scan_buffer, below.
 static constexpr unsigned max_pixels_per_line = 800;
@@ -94,24 +92,6 @@ ALIGNED(4) IN_LOCAL_RAM
 static unsigned char working_buffer[max_pixels_per_line];
 
 
-static INLINE void perf_tog() {
-  if (perf_out) {
-    gpioc.toggle(Gpio::p9);
-  }
-}
-
-static INLINE void perf_clear() {
-  if (perf_out) {
-    gpioc.clear(Gpio::p9);
-  }
-}
-
-static INLINE void perf_set() {
-  if (perf_out) {
-    gpioc.set(Gpio::p9);
-  }
-}
-
 /*******************************************************************************
  * Driver API.
  */
@@ -132,6 +112,8 @@ void init() {
 
   set_irq_priority(Interrupt::tim8_cc, 0);
   set_exception_priority(armv7m::Exception::pend_sv, 0xFF);
+
+  msigs_init();
 
   video_off();
 }
@@ -162,12 +144,6 @@ void video_on() {
   gpioe.set_output_type(0xFF00, Gpio::OutputType::push_pull);
   gpioe.set_output_speed(0xFF00, Gpio::OutputSpeed::high_100mhz);
   gpioe.set_mode(0xFF00, Gpio::Mode::gpio);
-
-  if (perf_out) {
-    gpioc.set_output_type(Gpio::p9, Gpio::OutputType::push_pull);
-    gpioc.set_output_speed(Gpio::p9, Gpio::OutputSpeed::high_100mhz);
-    gpioc.set_mode(Gpio::p9, Gpio::Mode::gpio);
-  }
 }
 
 void select_mode(Mode *mode) {

@@ -7,6 +7,7 @@ vga[cc_files] := \
   arena.cc \
   font_10x16.cc \
   graphics_1.cc \
+  measurement.cc \
   mode.cc \
   vga.cc \
   mode/raster_640x480x1.cc \

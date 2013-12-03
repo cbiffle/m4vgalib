@@ -52,6 +52,9 @@ static constexpr unsigned max_pixels_per_line = 800;
 // The current mode, set by select_mode.
 static Mode *current_mode;
 
+// The hblank callback action.
+static Callback hblank_callback;
+
 // [0, current_mode.video_end_line).  Updated at front porch interrupt.
 static unsigned volatile current_line;
 
@@ -146,7 +149,7 @@ void video_on() {
   gpioe.set_mode(0xFF00, Gpio::Mode::gpio);
 }
 
-void select_mode(Mode *mode) {
+void select_mode(Mode *mode, Callback cb) {
   // Disable outputs during mode change.
   video_off();
 
@@ -223,6 +226,7 @@ void select_mode(Mode *mode) {
   // Set up global state.
   current_mode = mode;
   current_line = 0;
+  hblank_callback = cb;
 
   // Start the timer.
   enable_irq(Interrupt::tim8_cc);
@@ -378,25 +382,28 @@ RAM_CODE void stm32f4xx_tim8_cc_handler() {
 
     vga::current_line = line + 1;
 
-    if (is_rendered_state(vga::state)) {
-      // Pend a PendSV to rasterize.
-      armv7m::scb.write_icsr(armv7m::Scb::icsr_value_t().with_pendsvset(true));
-    }
+    // Pend a PendSV to process hblank tasks.
+    armv7m::scb.write_icsr(armv7m::Scb::icsr_value_t().with_pendsvset(true));
   }
 }
 
 RAM_CODE
 void v7m_pend_sv_handler() {
-  // Flip working_buffer into scan_buffer.
-  // We know its contents are ready because otherwise we wouldn't take a new
-  // PendSV.
-  // Note that GCC can't see that we've aligned the buffers correctly, so we
-  // have to do a multi-cast dance. :-/
-  copy_words(reinterpret_cast<Word const *>(
-                 static_cast<void *>(vga::working_buffer)),
-             reinterpret_cast<Word *>(
-                 static_cast<void *>(vga::scan_buffer)),
-             sizeof(vga::working_buffer) / 4);
+  vga::Callback c = vga::hblank_callback;
+  if (c) c();
 
-  vga::current_mode->rasterize(vga::current_line, vga::working_buffer);
+  if (is_rendered_state(vga::state)) {
+    // Flip working_buffer into scan_buffer.
+    // We know its contents are ready because otherwise we wouldn't take a new
+    // PendSV.
+    // Note that GCC can't see that we've aligned the buffers correctly, so we
+    // have to do a multi-cast dance. :-/
+    copy_words(reinterpret_cast<Word const *>(
+                   static_cast<void *>(vga::working_buffer)),
+               reinterpret_cast<Word *>(
+                   static_cast<void *>(vga::scan_buffer)),
+               sizeof(vga::working_buffer) / 4);
+
+    vga::current_mode->rasterize(vga::current_line, vga::working_buffer);
+  }
 }

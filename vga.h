@@ -10,7 +10,9 @@ void init();
 void video_on();
 void video_off();
 
-void select_mode(Mode *);
+typedef void (*Callback)();
+
+void select_mode(Mode *, Callback = 0);
 
 void wait_for_vblank();
 

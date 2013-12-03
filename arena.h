@@ -9,6 +9,9 @@ namespace vga {
  */
 void arena_reset();
 
+unsigned arena_bytes_free();
+unsigned arena_bytes_total();
+
 }  // namespace vga
 
 /*

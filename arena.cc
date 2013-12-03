@@ -52,6 +52,18 @@ void arena_reset() {
   state[0].start = static_cast<Region *>(state[0].start) + region_count;
 }
 
+unsigned arena_bytes_free() {
+  unsigned free = 0;
+  for (unsigned i = 0; i < region_count; ++i) {
+    free += state[i].size_in_bytes();
+  }
+  return free;
+}
+
+unsigned arena_bytes_total() {
+  return arena_total_bytes;
+}
+
 }  // namespace vga
 
 void *operator new(unsigned bytes) {

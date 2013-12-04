@@ -8,7 +8,6 @@ namespace mode {
 
 static constexpr unsigned cols = 640;
 static constexpr unsigned rows = 480;
-static constexpr unsigned fb_stride = cols / 8;
 
 static stm32f4xx::ClockConfig const clock_cfg = {
   8000000,  // external crystal Hz
@@ -42,23 +41,8 @@ static Timing timing = {
   Timing::Polarity::negative,
 };
 
-Raster_640x480x1::Raster_640x480x1() : _rr(640, 480) {}
-
-void Raster_640x480x1::activate() {
-  _rr.activate(timing);
-}
-
-__attribute__((section(".ramcode")))
-void Raster_640x480x1::rasterize(unsigned line_number, Pixel *target) {
-  // Adjust frame line to displayed line.
-  line_number -= timing.video_start_line;
-  (void) _rr.rasterize(line_number, target);
-}
-
-__attribute__((section(".ramcode")))
-Timing const &Raster_640x480x1::get_timing() const {
-  return timing;
-}
+Raster_640x480x1::Raster_640x480x1()
+  : Raster_1(cols, rows, timing) {}
 
 }  // namespace mode
 }  // namespace vga

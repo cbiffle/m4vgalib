@@ -41,23 +41,8 @@ static Timing timing = {
   Timing::Polarity::positive,
 };
 
-Raster_800x600x1::Raster_800x600x1() : _rr(cols, rows) {}
-
-void Raster_800x600x1::activate() {
-  _rr.activate(timing);
-}
-
-__attribute__((section(".ramcode")))
-void Raster_800x600x1::rasterize(unsigned line_number, Pixel *target) {
-  // Adjust frame line to displayed line.
-  line_number -= timing.video_start_line;
-  (void) _rr.rasterize(line_number, target);
-}
-
-__attribute__((section(".ramcode")))
-Timing const &Raster_800x600x1::get_timing() const {
-  return timing;
-}
+Raster_800x600x1::Raster_800x600x1()
+  : Raster_1(cols, rows, timing) {}
 
 }  // namespace mode
 }  // namespace vga

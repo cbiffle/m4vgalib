@@ -2,7 +2,6 @@
 
 #include "lib/stm32f4xx/rcc.h"
 #include "vga/timing.h"
-#include "vga/unpack_1bpp.h"
 #include "vga/vga.h"
 
 namespace vga {
@@ -44,26 +43,17 @@ static Timing timing = {
   Timing::Polarity::negative,
 };
 
-void Raster_640x480x1::activate() {
-  _framebuffer[0] = new Pixel[fb_stride * rows];
-  _framebuffer[1] = new Pixel[fb_stride * rows];
-  _page1 = false;
-  _clut[0] = 0;
-  _clut[1] = 0xFF;
+Raster_640x480x1::Raster_640x480x1() : _rr(640, 480) {}
 
-  for (unsigned i = 0; i < fb_stride * rows; ++i) {
-    _framebuffer[0][i] = 0;
-    _framebuffer[1][i] = 0;
-  }
+void Raster_640x480x1::activate() {
+  _rr.activate(timing);
 }
 
 __attribute__((section(".ramcode")))
 void Raster_640x480x1::rasterize(unsigned line_number, Pixel *target) {
   // Adjust frame line to displayed line.
   line_number -= timing.video_start_line;
-  unsigned char const *src = _framebuffer[_page1] + fb_stride * line_number;
-
-  unpack_1bpp_impl(src, _clut, target, fb_stride);
+  (void) _rr.rasterize(line_number, target);
 }
 
 __attribute__((section(".ramcode")))
@@ -72,20 +62,19 @@ Timing const &Raster_640x480x1::get_timing() const {
 }
 
 Graphics1 Raster_640x480x1::make_bg_graphics() const {
-  return Graphics1(_framebuffer[!_page1], 640, 480, 640 / 32);
+  return _rr.make_bg_graphics();
 }
 
 void Raster_640x480x1::flip() {
-  vga::wait_for_vblank();
-  _page1 = !_page1;
+  _rr.flip();
 }
 
 void Raster_640x480x1::set_fg_color(Pixel c) {
-  _clut[1] = c;
+  _rr.set_fg_color(c);
 }
 
 void Raster_640x480x1::set_bg_color(Pixel c) {
-  _clut[0] = c;
+  _rr.set_bg_color(c);
 }
 
 }  // namespace mode

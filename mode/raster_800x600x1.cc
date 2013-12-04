@@ -2,7 +2,6 @@
 
 #include "lib/stm32f4xx/rcc.h"
 #include "vga/timing.h"
-#include "vga/unpack_1bpp.h"
 #include "vga/vga.h"
 
 namespace vga {
@@ -10,7 +9,6 @@ namespace mode {
 
 static constexpr unsigned cols = 800;
 static constexpr unsigned rows = 600;
-static constexpr unsigned fb_stride = cols / 8;
 
 static stm32f4xx::ClockConfig const clock_cfg = {
   8000000,  // external crystal Hz
@@ -44,26 +42,17 @@ static Timing timing = {
   Timing::Polarity::positive,
 };
 
-void Raster_800x600x1::activate() {
-  _framebuffer[0] = new unsigned char[fb_stride * rows];
-  _framebuffer[1] = new unsigned char[fb_stride * rows];
-  _page1 = false;
-  _clut[0] = 0;
-  _clut[1] = 0xFF;
+Raster_800x600x1::Raster_800x600x1() : _rr(cols, rows) {}
 
-  for (unsigned i = 0; i < fb_stride * rows; ++i) {
-    _framebuffer[0][i] = 0x00;
-    _framebuffer[1][i] = 0x00;
-  }
+void Raster_800x600x1::activate() {
+  _rr.activate(timing);
 }
 
 __attribute__((section(".ramcode")))
 void Raster_800x600x1::rasterize(unsigned line_number, Pixel *target) {
   // Adjust frame line to displayed line.
   line_number -= timing.video_start_line;
-  unsigned char const *src = _framebuffer[_page1] + fb_stride * line_number;
-
-  unpack_1bpp_impl(src, _clut, target, fb_stride);
+  (void) _rr.rasterize(line_number, target);
 }
 
 __attribute__((section(".ramcode")))
@@ -72,20 +61,19 @@ Timing const &Raster_800x600x1::get_timing() const {
 }
 
 Graphics1 Raster_800x600x1::make_bg_graphics() const {
-  return Graphics1(_framebuffer[!_page1], 800, 600, 800 / 32);
+  return _rr.make_bg_graphics();
 }
 
 void Raster_800x600x1::flip() {
-  vga::wait_for_vblank();
-  _page1 = !_page1;
+  _rr.flip();
 }
 
 void Raster_800x600x1::set_fg_color(Pixel c) {
-  _clut[1] = c;
+  _rr.set_fg_color(c);
 }
 
 void Raster_800x600x1::set_bg_color(Pixel c) {
-  _clut[0] = c;
+  _rr.set_bg_color(c);
 }
 
 }  // namespace mode

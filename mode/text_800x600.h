@@ -2,6 +2,7 @@
 #define VGA_MODE_TEXT_800X600_H
 
 #include "vga/mode.h"
+#include "vga/rast/text_10x16.h"
 
 namespace vga {
 namespace mode {
@@ -17,8 +18,7 @@ public:
   void put_char(unsigned col, unsigned row, Pixel fore, Pixel back, char);
 
 private:
-  unsigned *_framebuffer;
-  unsigned char *_font;
+  rast::Text_10x16 _rr;
 };
 
 }  // namespace mode

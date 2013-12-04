@@ -218,10 +218,10 @@ void select_mode(Mode *mode, Callback cb) {
     working_buffer[i + 1] = 0x00;
   }
   // Blank the final four pixels of the scan buffer.
-  scan_buffer[sizeof(scan_buffer) - 4] = 0;
-  scan_buffer[sizeof(scan_buffer) - 3] = 0;
-  scan_buffer[sizeof(scan_buffer) - 2] = 0;
-  scan_buffer[sizeof(scan_buffer) - 1] = 0;
+  scan_buffer[timing.video_pixels + 0] = 0;
+  scan_buffer[timing.video_pixels + 1] = 0;
+  scan_buffer[timing.video_pixels + 2] = 0;
+  scan_buffer[timing.video_pixels + 3] = 0;
 
   // Set up global state.
   current_mode = mode;
@@ -393,6 +393,7 @@ void v7m_pend_sv_handler() {
   if (c) c();
 
   if (is_rendered_state(vga::state)) {
+    vga::Timing const &timing = vga::current_mode->get_timing();
     // Flip working_buffer into scan_buffer.
     // We know its contents are ready because otherwise we wouldn't take a new
     // PendSV.
@@ -402,7 +403,7 @@ void v7m_pend_sv_handler() {
                    static_cast<void *>(vga::working_buffer)),
                reinterpret_cast<Word *>(
                    static_cast<void *>(vga::scan_buffer)),
-               sizeof(vga::working_buffer) / 4);
+               timing.video_pixels / 4);
 
     vga::current_mode->rasterize(vga::current_line, vga::working_buffer);
   }

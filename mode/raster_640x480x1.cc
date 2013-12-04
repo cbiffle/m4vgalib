@@ -2,7 +2,6 @@
 
 #include "lib/stm32f4xx/rcc.h"
 #include "vga/timing.h"
-#include "vga/vga.h"
 
 namespace vga {
 namespace mode {
@@ -59,22 +58,6 @@ void Raster_640x480x1::rasterize(unsigned line_number, Pixel *target) {
 __attribute__((section(".ramcode")))
 Timing const &Raster_640x480x1::get_timing() const {
   return timing;
-}
-
-Graphics1 Raster_640x480x1::make_bg_graphics() const {
-  return _rr.make_bg_graphics();
-}
-
-void Raster_640x480x1::flip() {
-  _rr.flip();
-}
-
-void Raster_640x480x1::set_fg_color(Pixel c) {
-  _rr.set_fg_color(c);
-}
-
-void Raster_640x480x1::set_bg_color(Pixel c) {
-  _rr.set_bg_color(c);
 }
 
 }  // namespace mode

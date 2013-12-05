@@ -6,9 +6,10 @@
 namespace vga {
 namespace rast {
 
-Bitmap_1::Bitmap_1(unsigned width, unsigned height)
+Bitmap_1::Bitmap_1(unsigned width, unsigned height, unsigned top_line)
   : _lines(height),
-    _bytes_per_line(width / 8) {}
+    _bytes_per_line(width / 8),
+    _top_line(top_line) {}
 
 
 void Bitmap_1::activate(Timing const &) {
@@ -30,6 +31,9 @@ void Bitmap_1::deactivate() {
 
 __attribute__((section(".ramcode")))
 Rasterizer::LineShape Bitmap_1::rasterize(unsigned line_number, Pixel *target) {
+  line_number -= _top_line;
+  if (line_number >= _lines) return { 0, 0 };
+
   unsigned char const *src = _fb[_page1] + _bytes_per_line * line_number;
 
   unpack_1bpp_impl(src, _clut, target, _bytes_per_line);

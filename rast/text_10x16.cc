@@ -7,23 +7,16 @@
 namespace vga {
 namespace rast {
 
-Text_10x16::Text_10x16()
-  : _cols(0),
-    _rows(0),
+Text_10x16::Text_10x16(unsigned width, unsigned height, unsigned top_line)
+  : _cols((width + 9) / 10),
+    _rows((height + 15) / 16),
     _fb(nullptr),
-    _font(nullptr) {}
+    _font(nullptr),
+    _top_line(top_line) {}
 
 void Text_10x16::activate(Timing const &timing) {
-  unsigned screen_rows =
-      timing.video_end_line - timing.video_start_line;
-
-  unsigned cols = timing.video_pixels / 10;
-  unsigned rows = screen_rows / 16;
-
   _font = new unsigned char[256 * 16];
-  _fb = new unsigned[cols * rows];
-  _cols = cols;
-  _rows = rows;
+  _fb = new unsigned[_cols * _rows];
 
   for (unsigned i = 0; i < 256 * 16; ++i) {
     _font[i] = font_10x16[i];
@@ -33,6 +26,9 @@ void Text_10x16::activate(Timing const &timing) {
 __attribute__((section(".ramcode")))
 Rasterizer::LineShape Text_10x16::rasterize(unsigned line_number,
                                             Pixel *raster_target) {
+  line_number -= _top_line;
+  if (line_number >= _rows * 16) return { 0, 0 };
+
   unsigned text_row = line_number / 16;
   unsigned row_in_glyph = line_number % 16;
 

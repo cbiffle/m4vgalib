@@ -9,7 +9,7 @@ namespace rast {
 
 class Bitmap_1 : public Rasterizer {
 public:
-  Bitmap_1(unsigned width, unsigned height);
+  Bitmap_1(unsigned width, unsigned height, unsigned top_line = 0);
 
   virtual void activate(Timing const &);
   virtual LineShape rasterize(unsigned, Pixel *);
@@ -25,6 +25,7 @@ private:
   unsigned char *_fb[2];
   unsigned _lines;
   unsigned _bytes_per_line;
+  unsigned _top_line;
   bool _page1;
   Pixel _clut[2];
 };

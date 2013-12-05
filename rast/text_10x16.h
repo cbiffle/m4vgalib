@@ -8,7 +8,7 @@ namespace rast {
 
 class Text_10x16 : public Rasterizer {
 public:
-  Text_10x16();
+  Text_10x16(unsigned width, unsigned height, unsigned top_line = 0);
 
   virtual void activate(Timing const &);
   virtual LineShape rasterize(unsigned, Pixel *);
@@ -25,6 +25,7 @@ private:
   unsigned _rows;
   unsigned *_fb;
   unsigned char *_font;
+  unsigned _top_line;
 };
 
 }  // namespace rast

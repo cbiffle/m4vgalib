@@ -47,7 +47,7 @@ Graphics1 Bitmap_1::make_bg_graphics() const {
 }
 
 void Bitmap_1::flip() {
-  vga::wait_for_vblank();
+  vga::sync_to_vblank();
   _page1 = !_page1;
 }
 

@@ -14,8 +14,7 @@ public:
   virtual void rasterize(unsigned line_number, Pixel *target);
   virtual Timing const &get_timing() const;
 
-  void clear_framebuffer(Pixel);
-  void put_char(unsigned col, unsigned row, Pixel fore, Pixel back, char);
+  rast::Text_10x16 &get_rasterizer() { return _rr; }
 
 private:
   rast::Text_10x16 _rr;

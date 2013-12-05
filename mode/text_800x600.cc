@@ -62,14 +62,5 @@ Timing const &Text_800x600::get_timing() const {
   return timing;
 }
 
-void Text_800x600::clear_framebuffer(Pixel bg) {
-  _rr.clear_framebuffer(bg);
-}
-
-void Text_800x600::put_char(unsigned col, unsigned row,
-                            Pixel fore, Pixel back, char c) {
-  _rr.put_char(col, row, fore, back, c);
-}
-
 }  // namespace mode
 }  // namespace vga

@@ -361,7 +361,6 @@ RAM_CODE void stm32f4xx_tim8_cc_handler() {
     if (line == 0) {
       // Start of frame!  Time to stop displaying pixels.
       vga::state = vga::State::blank;
-      mode.top_of_frame();
       // TODO(cbiffle): latch configuration changes.
     } else if (line == timing.vsync_start_line
             || line == timing.vsync_end_line) {

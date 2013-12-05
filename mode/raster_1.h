@@ -12,7 +12,6 @@ public:
   Raster_1(unsigned width, unsigned height, Timing const &);
 
   virtual void activate();
-  virtual void rasterize(unsigned line_number, Pixel *target);
   virtual Timing const &get_timing() const;
 
   rast::Bitmap_1 &get_rasterizer() { return _rr; }

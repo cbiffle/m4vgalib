@@ -8,15 +8,11 @@ vga[cc_files] := \
   font_10x16.cc \
   graphics_1.cc \
   measurement.cc \
-  mode.cc \
   rasterizer.cc \
+  timing.cc \
   vga.cc \
   rast/bitmap_1.cc \
-  rast/text_10x16.cc \
-  mode/raster_1.cc \
-  mode/raster_640x480x1.cc \
-  mode/raster_800x600x1.cc \
-  mode/text_800x600.cc
+  rast/text_10x16.cc
 
 vga[S_files] := \
   copy_words.S \

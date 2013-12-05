@@ -22,7 +22,7 @@ struct Timing {
    * AHB) frequency.  The clock_config specifies how to achieve the desired
    * CPU clock, and thus implicitly defines the CPU clock.
    */
-  stm32f4xx::ClockConfig const *clock_config;
+  stm32f4xx::ClockConfig clock_config;
 
   /*
    * Horizontal timing.
@@ -51,6 +51,12 @@ struct Timing {
   ushort video_end_line;    // Bottom edge of active video.
   Polarity vsync_polarity;  // Polarity of vsync pulse.
 };
+
+/*
+ * Canned timings for common modes at our crystal frequency.
+ */
+extern Timing const timing_vesa_640x480_60hz;
+extern Timing const timing_vesa_800x600_60hz;
 
 }  // namespace vga
 

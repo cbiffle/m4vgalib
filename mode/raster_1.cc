@@ -14,13 +14,6 @@ void Raster_1::activate() {
 }
 
 __attribute__((section(".ramcode")))
-void Raster_1::rasterize(unsigned line_number, Pixel *target) {
-  // Adjust frame line to displayed line.
-  line_number -= _timing.video_start_line;
-  (void) _rr.rasterize(line_number, target);
-}
-
-__attribute__((section(".ramcode")))
 Timing const &Raster_1::get_timing() const {
   return _timing;
 }

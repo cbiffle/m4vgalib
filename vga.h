@@ -1,9 +1,10 @@
 #ifndef VGA_VGA_H
 #define VGA_VGA_H
 
-#include "vga/mode.h"
-
 namespace vga {
+
+struct Timing;
+class Rasterizer;
 
 void init();
 
@@ -12,7 +13,9 @@ void video_off();
 
 typedef void (*Callback)();
 
-void select_mode(Mode *, Callback = 0);
+void configure_timing(Timing const &, Callback = 0);
+
+void configure_band(unsigned start, unsigned length, Rasterizer *);
 
 void wait_for_vblank();
 

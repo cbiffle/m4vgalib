@@ -19,6 +19,7 @@
 #include "vga/copy_words.h"
 #include "vga/timing.h"
 #include "vga/measurement.h"
+#include "vga/rasterizer.h"
 
 using stm32f4xx::AdvTimer;
 using stm32f4xx::AhbPeripheral;
@@ -46,11 +47,13 @@ namespace vga {
  * Driver state and configuration.
  */
 
-// Used to adjust size of scan_buffer, below.
+// Used to adjust size of scan_buffer.
 static constexpr unsigned max_pixels_per_line = 800;
+// Used to size rasterization plan.
+static constexpr unsigned max_lines = 600;
 
-// The current mode, set by select_mode.
-static Mode *current_mode;
+// A copy of the current Timing, held in RAM for fast access.
+static Timing current_timing;
 
 // The hblank callback action.
 static Callback hblank_callback;
@@ -94,6 +97,8 @@ static unsigned char scan_buffer[max_pixels_per_line + 4];
 ALIGNED(4) IN_LOCAL_RAM
 static unsigned char working_buffer[max_pixels_per_line];
 
+static Rasterizer *line_rasterizers[max_lines];
+
 
 /*******************************************************************************
  * Driver API.
@@ -118,7 +123,10 @@ void init() {
 
   msigs_init();
 
+  for (auto &r : line_rasterizers) r = nullptr;
+
   video_off();
+  arena_reset();
 }
 
 void video_off() {
@@ -149,7 +157,7 @@ void video_on() {
   gpioe.set_mode(0xFF00, Gpio::Mode::gpio);
 }
 
-void select_mode(Mode *mode, Callback cb) {
+void configure_timing(Timing const &timing, Callback cb) {
   // Disable outputs during mode change.
   video_off();
 
@@ -161,15 +169,8 @@ void select_mode(Mode *mode, Callback cb) {
   // Busy-wait for pending DMA to complete.
   while (dma2.stream1.read_cr().get_en());
 
-  if (current_mode) current_mode->deactivate();
-
-  arena_reset();
-
-  mode->activate();
-  Timing const &timing = mode->get_timing();
-
   // Switch to new CPU clock settings.
-  rcc.configure_clocks(*timing.clock_config);
+  rcc.configure_clocks(timing.clock_config);
 
   // Enable Flash cache and prefetching to try and reduce jitter.
   flash.write_acr(flash.read_acr()
@@ -224,9 +225,9 @@ void select_mode(Mode *mode, Callback cb) {
   scan_buffer[timing.video_pixels + 3] = 0;
 
   // Set up global state.
-  current_mode = mode;
   current_line = 0;
   hblank_callback = cb;
+  current_timing = timing;
 
   // Start the timer.
   enable_irq(Interrupt::tim8_cc);
@@ -236,12 +237,22 @@ void select_mode(Mode *mode, Callback cb) {
   video_on();
 }
 
+void configure_band(unsigned start, unsigned length, Rasterizer *rasterizer) {
+  unsigned end = start + length;
+  if (end < start) return;
+  end = end >= max_lines ? max_lines - 1 : end;
+
+  for (unsigned i = start; i < end; ++i) {
+    line_rasterizers[i] = rasterizer;
+  }
+}
+
 void wait_for_vblank() {
   while (!in_vblank());
 }
 
 bool in_vblank() {
-  return current_line < current_mode->get_timing().video_start_line;
+  return current_line < current_timing.video_start_line;
 }
 
 void sync_to_vblank() {
@@ -259,8 +270,7 @@ RAM_CODE void stm32f4xx_tim8_cc_handler() {
   auto sr = tim8.read_sr();
   tim8.write_sr(sr.with_cc2if(false).with_cc3if(false));
 
-  vga::Mode &mode = *vga::current_mode;
-  vga::Timing const &timing = mode.get_timing();
+  vga::Timing const &timing = vga::current_timing;
 
   if (sr.get_cc2if()) {
     // CC2 indicates start of active video (end of back porch).
@@ -392,7 +402,7 @@ void v7m_pend_sv_handler() {
   if (c) c();
 
   if (is_rendered_state(vga::state)) {
-    vga::Timing const &timing = vga::current_mode->get_timing();
+    vga::Timing const &timing = vga::current_timing;
     // Flip working_buffer into scan_buffer.
     // We know its contents are ready because otherwise we wouldn't take a new
     // PendSV.
@@ -404,6 +414,11 @@ void v7m_pend_sv_handler() {
                    static_cast<void *>(vga::scan_buffer)),
                timing.video_pixels / 4);
 
-    vga::current_mode->rasterize(vga::current_line, vga::working_buffer);
+    unsigned line = vga::current_line;
+    if (line >= timing.video_start_line && line <= timing.video_end_line) {
+      unsigned visible_line = line - timing.video_start_line;
+      vga::Rasterizer *r = vga::line_rasterizers[visible_line];
+      if (r) r->rasterize(visible_line, vga::working_buffer);
+    }
   }
 }

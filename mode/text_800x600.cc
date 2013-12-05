@@ -51,13 +51,6 @@ void Text_800x600::deactivate() {
 }
 
 __attribute__((section(".ramcode")))
-void Text_800x600::rasterize(unsigned line_number, Pixel *target) {
-  line_number -= timing.video_start_line;
-
-  (void) _rr.rasterize(line_number, target);
-}
-
-__attribute__((section(".ramcode")))
 Timing const &Text_800x600::get_timing() const {
   return timing;
 }

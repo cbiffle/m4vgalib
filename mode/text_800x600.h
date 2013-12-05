@@ -11,7 +11,6 @@ class Text_800x600 : public Mode {
 public:
   virtual void activate();
   virtual void deactivate();
-  virtual void rasterize(unsigned line_number, Pixel *target);
   virtual Timing const &get_timing() const;
 
   rast::Text_10x16 &get_rasterizer() { return _rr; }

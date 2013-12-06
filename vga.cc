@@ -55,9 +55,6 @@ static constexpr unsigned max_lines = 600;
 // A copy of the current Timing, held in RAM for fast access.
 static Timing current_timing;
 
-// The hblank callback action.
-static Callback hblank_callback;
-
 // [0, current_mode.video_end_line).  Updated at front porch interrupt.
 static unsigned volatile current_line;
 
@@ -157,7 +154,7 @@ void video_on() {
   gpioe.set_mode(0xFF00, Gpio::Mode::gpio);
 }
 
-void configure_timing(Timing const &timing, Callback cb) {
+void configure_timing(Timing const &timing) {
   // Disable outputs during mode change.
   video_off();
 
@@ -226,7 +223,6 @@ void configure_timing(Timing const &timing, Callback cb) {
 
   // Set up global state.
   current_line = 0;
-  hblank_callback = cb;
   current_timing = timing;
 
   // Start the timer.
@@ -259,6 +255,12 @@ void sync_to_vblank() {
   while (in_vblank());
   wait_for_vblank();
 }
+
+void default_hblank_interrupt();  // decl hack
+RAM_CODE void default_hblank_interrupt() {}
+
+void hblank_interrupt()
+  __attribute__((weak, alias("_ZN3vga24default_hblank_interruptEv")));
 
 }  // namespace vga
 
@@ -398,8 +400,7 @@ RAM_CODE void stm32f4xx_tim8_cc_handler() {
 
 RAM_CODE
 void v7m_pend_sv_handler() {
-  vga::Callback c = vga::hblank_callback;
-  if (c) c();
+  vga::hblank_interrupt();
 
   if (is_rendered_state(vga::state)) {
     vga::Timing const &timing = vga::current_timing;

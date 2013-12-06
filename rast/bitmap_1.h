@@ -17,9 +17,13 @@ public:
 
   Graphics1 make_bg_graphics() const;
   void flip();
+  void flip_now();
 
   void set_fg_color(Pixel);
   void set_bg_color(Pixel);
+
+  void *get_fg_buffer() const { return _fb[_page1]; }
+  void *get_bg_buffer() const { return _fb[!_page1]; }
 
 private:
   unsigned char *_fb[2];

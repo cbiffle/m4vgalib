@@ -51,6 +51,10 @@ void Bitmap_1::flip() {
   _page1 = !_page1;
 }
 
+void Bitmap_1::flip_now() {
+  _page1 = !_page1;
+}
+
 void Bitmap_1::set_fg_color(Pixel c) {
   _clut[1] = c;
 }

@@ -94,6 +94,8 @@ static unsigned char scan_buffer[max_pixels_per_line + 4];
 ALIGNED(4) IN_LOCAL_RAM
 static unsigned char working_buffer[max_pixels_per_line];
 
+static Rasterizer::LineShape working_buffer_shape;
+
 static Rasterizer *line_rasterizers[max_lines];
 
 
@@ -288,7 +290,7 @@ RAM_CODE void stm32f4xx_tim8_cc_handler() {
       auto &st = dma2.stream1;
 
       // Prepare to transfer pixels as words, plus the final black word.
-      st.write_ndtr(timing.video_pixels / 4 + 1);
+      st.write_ndtr(vga::working_buffer_shape.length / 4 + 1);
 
       // Set addresses.  Note that we're using memory as the peripheral side.
       // This DMA controller is a little odd.
@@ -409,17 +411,26 @@ void v7m_pend_sv_handler() {
     // PendSV.
     // Note that GCC can't see that we've aligned the buffers correctly, so we
     // have to do a multi-cast dance. :-/
+    ((unsigned *) (void *) vga::scan_buffer)[
+        vga::working_buffer_shape.length / 4] = 0;
     copy_words(reinterpret_cast<Word const *>(
                    static_cast<void *>(vga::working_buffer)),
                reinterpret_cast<Word *>(
                    static_cast<void *>(vga::scan_buffer)),
-               timing.video_pixels / 4);
+               vga::working_buffer_shape.length / 4);
 
     unsigned line = vga::current_line;
     if (line >= timing.video_start_line && line <= timing.video_end_line) {
       unsigned visible_line = line - timing.video_start_line;
       vga::Rasterizer *r = vga::line_rasterizers[visible_line];
-      if (r) r->rasterize(visible_line, vga::working_buffer);
+      if (r) {
+        vga::Rasterizer::LineShape shape = r->rasterize(visible_line,
+                                                        vga::working_buffer);
+        vga::working_buffer_shape = shape;
+        tim8.write_ccr2(timing.sync_pixels
+                        + timing.back_porch_pixels - timing.video_lead
+                        + shape.offset);
+      }
     }
   }
 }

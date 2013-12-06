@@ -3,6 +3,7 @@
 #include "lib/common/attribute_macros.h"
 #include "lib/armv7m/exceptions.h"
 #include "lib/armv7m/exception_table.h"
+#include "lib/armv7m/instructions.h"
 #include "lib/armv7m/scb.h"
 
 #include "lib/stm32f4xx/adv_timer.h"
@@ -246,7 +247,7 @@ void configure_band(unsigned start, unsigned length, Rasterizer *rasterizer) {
 }
 
 void wait_for_vblank() {
-  while (!in_vblank());
+  while (!in_vblank()) armv7m::wait_for_interrupt();
 }
 
 bool in_vblank() {
@@ -254,7 +255,7 @@ bool in_vblank() {
 }
 
 void sync_to_vblank() {
-  while (in_vblank());
+  while (in_vblank()) armv7m::wait_for_interrupt();
   wait_for_vblank();
 }
 

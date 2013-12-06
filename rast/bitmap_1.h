@@ -25,6 +25,10 @@ public:
   void *get_fg_buffer() const { return _fb[_page1]; }
   void *get_bg_buffer() const { return _fb[!_page1]; }
 
+  bool can_fg_use_bitband() const;
+  bool can_bg_use_bitband() const;
+  void copy_bg_to_fg() const;
+
 private:
   unsigned char *_fb[2];
   unsigned _lines;

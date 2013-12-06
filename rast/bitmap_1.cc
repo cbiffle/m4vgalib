@@ -1,5 +1,6 @@
 #include "vga/rast/bitmap_1.h"
 
+#include "vga/copy_words.h"
 #include "vga/vga.h"
 #include "vga/unpack_1bpp.h"
 
@@ -42,6 +43,8 @@ Rasterizer::LineShape Bitmap_1::rasterize(unsigned line_number, Pixel *target) {
 }
 
 Graphics1 Bitmap_1::make_bg_graphics() const {
+  if (!can_bg_use_bitband()) while (1);
+
   return Graphics1(_fb[!_page1], _bytes_per_line * 8, _lines,
                                  _bytes_per_line / 4);
 }
@@ -53,6 +56,24 @@ void Bitmap_1::flip() {
 
 void Bitmap_1::flip_now() {
   _page1 = !_page1;
+}
+
+bool Bitmap_1::can_fg_use_bitband() const {
+  unsigned addr = reinterpret_cast<unsigned>(_fb[_page1]);
+  return (addr >= 0x20000000 && addr < 0x20100000)
+      || (addr < 0x100000);
+}
+
+bool Bitmap_1::can_bg_use_bitband() const {
+  unsigned addr = reinterpret_cast<unsigned>(_fb[!_page1]);
+  return (addr >= 0x20000000 && addr < 0x20100000)
+      || (addr < 0x100000);
+}
+
+void Bitmap_1::copy_bg_to_fg() const {
+  copy_words(reinterpret_cast<armv7m::Word *>((void *) _fb[!_page1]),
+             reinterpret_cast<armv7m::Word *>((void *) _fb[_page1]),
+             _bytes_per_line * _lines / 4);
 }
 
 void Bitmap_1::set_fg_color(Pixel c) {

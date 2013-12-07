@@ -74,8 +74,8 @@ _ZN3vga16unpack_1bpp_implEPKvPKhPhj:
       @ repeating bit pattern and multiplication are very cheap on this
       @ architecture!
       mov clut, #0x01010101             @ Magic byte-lane smear constant.   1
-      mul vclut0, vclut0, clut          @ Make vectors                      1
-      mul vclut1, vclut1, clut          @ out of each entry.                1
+      muls vclut0, clut                 @ Make vectors                      1
+      muls vclut1, clut                 @ out of each entry.                1
 
       @ The register formerly known as clut changes roles here...
       colors .req clut
@@ -84,6 +84,7 @@ _ZN3vga16unpack_1bpp_implEPKvPKhPhj:
       @ Total cycles for startup:                                          10
 
       @ Enough paperwork.  Start unpacking!
+      .balign 4
 0:    ldr bits, [framebuffer], #4       @ Load a block of 32 pixels.        2
       ror bits, #16                     @ Rotate bits 3:0 into 19:16.       1
 
@@ -95,8 +96,8 @@ _ZN3vga16unpack_1bpp_implEPKvPKhPhj:
       UNPACK_FOUR_PIXELS    @ Pixels 16-19                                  5
       UNPACK_FOUR_PIXELS    @ Pixels 20-23                                  5
       UNPACK_FOUR_PIXELS    @ Pixels 24-27                                  5
-      subs bytes, #4        @ Hoist to improve branch speculation below.    1
       UNPACK_FOUR_PIXELS 1  @ Pixels 28-31                                  4
+      subs bytes, #4                                                      @ 1
       bhi 0b                                                              @ 3/1
 
       @ Total cycles for loop body:                                        46/44

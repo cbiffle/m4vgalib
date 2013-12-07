@@ -72,6 +72,7 @@ _ZN3vga31unpack_text_10p_attributed_implEPKvPKhPhj:
       mov lsbs, #0x01010101
 
       @ Get on with it!
+      .balign 4
 0:    @ Load an attributed character into bits.
       ldr bits, [text], #4
 

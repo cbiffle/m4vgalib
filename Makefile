@@ -12,12 +12,14 @@ vga[cc_files] := \
   timing.cc \
   vga.cc \
   rast/bitmap_1.cc \
+  rast/direct.cc \
   rast/text_10x16.cc
 
 vga[S_files] := \
   copy_words.S \
   graphics_1_assist.S \
   unpack_1bpp.S \
+  unpack_direct_x4.S \
   unpack_text_10p_attributed.S
 
 vga[cc_flags] := -std=gnu++0x

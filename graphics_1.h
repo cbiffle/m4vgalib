@@ -15,10 +15,10 @@ public:
   void set_pixel(unsigned x, unsigned y);
   void clear_pixel(unsigned x, unsigned y);
 
-  void draw_line(unsigned x1, unsigned y1, unsigned x2, unsigned y2, bool set);
+  void draw_line(int x1, int y1, int x2, int y2, bool set);
 
-  void set_line(unsigned x1, unsigned y1, unsigned x2, unsigned y2);
-  void clear_line(unsigned x1, unsigned y1, unsigned x2, unsigned y2);
+  void set_line(int x1, int y1, int x2, int y2);
+  void clear_line(int x1, int y1, int x2, int y2);
 
 private:
   void *_fb;
@@ -27,6 +27,8 @@ private:
   unsigned _stride_words;
 
   unsigned *bit_addr(unsigned x, unsigned y);
+
+  unsigned compute_out_code(int x, int y);
 };
 
 }  // namespace vga

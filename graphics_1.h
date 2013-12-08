@@ -15,6 +15,8 @@ public:
   void set_pixel(unsigned x, unsigned y);
   void clear_pixel(unsigned x, unsigned y);
 
+  void draw_line(unsigned x1, unsigned y1, unsigned x2, unsigned y2, bool set);
+
   void set_line(unsigned x1, unsigned y1, unsigned x2, unsigned y2);
   void clear_line(unsigned x1, unsigned y1, unsigned x2, unsigned y2);
 

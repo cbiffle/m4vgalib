@@ -36,7 +36,8 @@ static int abs(int v) {
 }
 
 __attribute__((section(".ramcode")))
-void Graphics1::set_line(unsigned x1, unsigned y1, unsigned x2, unsigned y2) {
+void Graphics1::draw_line(unsigned x1, unsigned y1, unsigned x2, unsigned y2,
+                          bool set) {
   int dx = abs(x2 - x1);
   int dy = abs(y2 - y1);
 
@@ -53,7 +54,7 @@ void Graphics1::set_line(unsigned x1, unsigned y1, unsigned x2, unsigned y2) {
   unsigned * const final_out = bit_addr(x2, y2);
 
   while (out != final_out) {
-    *out = 1;
+    *out = set;
     int e2 = err * 2;
     if (e2 > -dy) {
       err -= dy;
@@ -67,34 +68,13 @@ void Graphics1::set_line(unsigned x1, unsigned y1, unsigned x2, unsigned y2) {
 }
 
 __attribute__((section(".ramcode")))
+void Graphics1::set_line(unsigned x1, unsigned y1, unsigned x2, unsigned y2) {
+  draw_line(x1, y1, x2, y2, true);
+}
+
+__attribute__((section(".ramcode")))
 void Graphics1::clear_line(unsigned x1, unsigned y1, unsigned x2, unsigned y2) {
-  int dx = abs(x2 - x1);
-  int dy = abs(y2 - y1);
-
-  if (x1 > x2) {
-    swap(x1, x2);
-    swap(y1, y2);
-  }
-
-  int sy = (y1 < y2) ? _width_px : -_width_px;
-
-  int err = dx - dy;
-
-  unsigned *out = bit_addr(x1, y1);
-  unsigned * const final_out = bit_addr(x2, y2);
-
-  while (out != final_out) {
-    *out = 0;
-    int e2 = err * 2;
-    if (e2 > -dy) {
-      err -= dy;
-      ++out;
-    }
-    if (e2 < dx) {
-      err += dx;
-      out += sy;
-    }
-  }
+  draw_line(x1, y1, x2, y2, false);
 }
 
 }  // namespace vga

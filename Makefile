@@ -22,7 +22,7 @@ vga[S_files] := \
   unpack_direct_x4.S \
   unpack_text_10p_attributed.S
 
-vga[cc_flags] := -std=gnu++0x
+vga[cc_flags] := -std=gnu++0x -O2
 
 vga[libs] := \
   lib/stm32f4xx:stm32f4xx

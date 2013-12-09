@@ -167,18 +167,31 @@ void Graphics1::draw_line_clipped(int x1, int y1, int x2, int y2, bool set) {
   unsigned *out = bit_addr(x1, y1);
   unsigned * const final_out = bit_addr(x2, y2);
 
-  while (out != final_out) {
-    *out = set;
-    int e2 = err * 2;
-    if (e2 > -dy) {
-      err -= dy;
-      ++out;
-    }
-    if (e2 < dx) {
-      err += dx;
-      out += sy;
-    }
-  }
+  register int e2;
+  asm volatile (
+    "    b 1f \n"
+    "    .balign 4 \n"
+    "0:  str %[set], [%[out]] \n"
+    "    lsls %[e2], %[error], #1 \n"
+    "    cmp %[e2], %[ndy] \n"
+    "    itt gt \n"
+    "    addgt %[error], %[ndy] \n"
+    "    addgt %[out], #4 \n"
+    "    cmp %[e2], %[dx] \n"
+    "    itt lt \n"
+    "    addlt %[error], %[dx] \n"
+    "    addlt %[out], %[stride] \n"
+    "1:  cmp %[out], %[final_out] \n"
+    "    bne 0b \n"
+  : [out] "+&r" (out),
+    [e2] "=&r" (e2),
+    [error] "+&r" (err)
+  : [set] "r" (set),
+    [ndy] "r" (-dy),
+    [dx] "r" (dx),
+    [stride] "r" (sy * 4),
+    [final_out] "r" (final_out)
+  );
 }
 
 __attribute__((section(".ramcode")))

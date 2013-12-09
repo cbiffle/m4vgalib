@@ -18,6 +18,7 @@ void Graphics1::clear_pixel(unsigned x, unsigned y) {
   *bit_addr(x, y) = 0;
 }
 
+__attribute__((section(".ramcode")))
 unsigned *Graphics1::bit_addr(unsigned x, unsigned y) {
   unsigned offset = reinterpret_cast<unsigned>(_fb);
   unsigned bit_base = offset * 32 + 0x22000000;

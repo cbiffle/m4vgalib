@@ -29,6 +29,7 @@ private:
   unsigned *bit_addr(unsigned x, unsigned y);
 
   unsigned compute_out_code(int x, int y);
+  void draw_line_clipped(int x1, int y1, int x2, int y2, bool set);
 };
 
 }  // namespace vga

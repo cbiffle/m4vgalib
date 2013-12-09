@@ -94,6 +94,11 @@ void Graphics1::draw_line(int x1, int y1, int x2, int y2,
     }
   }
 
+  draw_line_clipped(x1, y1, x2, y2, set);
+}
+
+__attribute__((section(".ramcode")))
+void Graphics1::draw_line_clipped(int x1, int y1, int x2, int y2, bool set) {
   int dx = abs(x2 - x1);
   int dy = abs(y2 - y1);
 

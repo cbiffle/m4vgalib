@@ -16,6 +16,7 @@ public:
   void clear_pixel(unsigned x, unsigned y);
 
   void draw_line(int x1, int y1, int x2, int y2, bool set);
+  void draw_line(float x1, float y1, float x2, float y2, bool set);
 
   void set_line(int x1, int y1, int x2, int y2);
   void clear_line(int x1, int y1, int x2, int y2);
@@ -29,6 +30,7 @@ private:
   unsigned *bit_addr(unsigned x, unsigned y);
 
   unsigned compute_out_code(int x, int y);
+  unsigned compute_out_code(float x, float y);
   void draw_line_clipped(int x1, int y1, int x2, int y2, bool set);
 };
 

@@ -56,6 +56,19 @@ unsigned Graphics1::compute_out_code(int x, int y) {
   return code;
 }
 
+__attribute__((section(".ramcode")))
+unsigned Graphics1::compute_out_code(float x, float y) {
+  unsigned code = 0;
+
+  if (x < 0) code |= out_left;
+  else if (x >= _width_px) code |= out_right;
+
+  if (y < 0) code |= out_top;
+  else if (y >= _height_px) code |= out_bottom;
+
+  return code;
+}
+
 
 __attribute__((section(".ramcode")))
 void Graphics1::draw_line(int x1, int y1, int x2, int y2,
@@ -95,6 +108,46 @@ void Graphics1::draw_line(int x1, int y1, int x2, int y2,
   }
 
   draw_line_clipped(x1, y1, x2, y2, set);
+}
+
+__attribute__((section(".ramcode")))
+void Graphics1::draw_line(float x1, float y1, float x2, float y2,
+                          bool set) {
+  unsigned code0 = compute_out_code(x1, y1);
+  unsigned code1 = compute_out_code(x2, y2);
+
+  while (code0 || code1) {
+    if (code0 & code1) return;
+
+    unsigned code = code0 ? code0 : code1;
+    float x, y;
+
+    if (code & out_bottom) {
+      x = x1 + (x2 - x1) * (static_cast<int>(_height_px) - 1 - y1) / (y2 - y1);
+      y = _height_px - 1;
+    } else if (code & out_top) {
+      x = x1 + (x2 - x1) * -y1 / (y2 - y1);
+      y = 0;
+    } else if (code & out_right) {
+      y = y1 + (y2 - y1) * (static_cast<int>(_width_px) - 1 - x1) / (x2 - x1);
+      x = _width_px - 1;
+    } else /*if (code & out_left)*/ {
+      y = y1 + (y2 - y1) * (-x1) / (x2 - x1);
+      x = 0;
+    }
+
+    if (code == code0) {
+      x1 = x;
+      y1 = y;
+      code0 = compute_out_code(x1, y1);
+    } else {
+      x2 = x;
+      y2 = y;
+      code1 = compute_out_code(x2, y2);
+    }
+  }
+
+  draw_line_clipped(x1 + 0.5f, y1 + 0.5f, x2 + 0.5f, y2 + 0.5f, set);
 }
 
 __attribute__((section(".ramcode")))

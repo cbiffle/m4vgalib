@@ -21,6 +21,8 @@ public:
   void set_line(int x1, int y1, int x2, int y2);
   void clear_line(int x1, int y1, int x2, int y2);
 
+  void clear_all();
+
 private:
   void *_fb;
   unsigned _width_px;

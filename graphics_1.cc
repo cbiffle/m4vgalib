@@ -228,4 +228,11 @@ void Graphics1::clear_line(int x1, int y1, int x2, int y2) {
   draw_line(x1, y1, x2, y2, false);
 }
 
+__attribute__((section(".ramcode")))
+void Graphics1::clear_all() {
+  unsigned *fb32 = static_cast<unsigned *>(_fb);
+  unsigned *end = fb32 + _height_px * _stride_words;
+  while (fb32 != end) *fb32++ = 0;
+}
+
 }  // namespace vga

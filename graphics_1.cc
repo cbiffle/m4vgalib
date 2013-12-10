@@ -32,10 +32,6 @@ static void swap(int &a, int &b) {
   b = t;
 }
 
-static int abs(int v) {
-  return v < 0 ? -v : v;
-}
-
 enum {
   out_left = 1,
   out_right = 2,
@@ -151,47 +147,75 @@ void Graphics1::draw_line(float x1, float y1, float x2, float y2,
 }
 
 __attribute__((section(".ramcode")))
-void Graphics1::draw_line_clipped(int x1, int y1, int x2, int y2, bool set) {
-  int dx = abs(x2 - x1);
-  int dy = abs(y2 - y1);
+void Graphics1::draw_line_clipped_x(unsigned *out, int dx, int dy, int dir,
+                                    bool set) {
+  int dy2 = dy * 2;
+  int dx2 = dx * 2;
+  int error = dy2 - dx;
 
-  if (x1 > x2) {
-    swap(x1, x2);
-    swap(y1, y2);
+  unsigned stride = _width_px;
+
+  *out = set;
+
+  while (dx--) {
+    if (error >= 0) {
+      out += stride;
+      error -= dx2;
+    }
+    error += dy2;
+    out += dir;
+    *out = set;
+  }
+}
+
+__attribute__((section(".ramcode")))
+void Graphics1::draw_line_clipped_y(unsigned *out, int dx, int dy, int dir,
+                                    bool set) {
+  int dx2 = dx * 2;
+  int dy2 = dy * 2;
+  int error = dx2 - dy;
+
+  unsigned stride = _width_px;
+
+  *out = set;
+
+  while (dy--) {
+    if (error >= 0) {
+      out += dir;
+      error -= dy2;
+    }
+    error += dx2;
+    out += stride;
+    *out = set;
+  }
+}
+
+__attribute__((section(".ramcode")))
+void Graphics1::draw_line_clipped(int x0, int y0, int x1, int y1, bool set) {
+  if (y0 > y1) {
+    swap(x0, x1);
+    swap(y0, y1);
   }
 
-  int sy = (y1 < y2) ? _width_px : -_width_px;
+  int dx = x1 - x0;
+  int dy = y1 - y0;  // Nonnegative now
 
-  int err = dx - dy;
+  unsigned *out = bit_addr(x0, y0);
 
-  unsigned *out = bit_addr(x1, y1);
-  unsigned * const final_out = bit_addr(x2, y2);
-
-  register int e2;
-  asm volatile (
-    "    b 1f \n"
-    "    .balign 4 \n"
-    "0:  str %[set], [%[out]] \n"
-    "    lsls %[e2], %[error], #1 \n"
-    "    cmp %[e2], %[ndy] \n"
-    "    itt gt \n"
-    "    addgt %[error], %[ndy] \n"
-    "    addgt %[out], #4 \n"
-    "    cmp %[e2], %[dx] \n"
-    "    itt lt \n"
-    "    addlt %[error], %[dx] \n"
-    "    addlt %[out], %[stride] \n"
-    "1:  cmp %[out], %[final_out] \n"
-    "    bne 0b \n"
-  : [out] "+&r" (out),
-    [e2] "=&r" (e2),
-    [error] "+&r" (err)
-  : [set] "r" (set),
-    [ndy] "r" (-dy),
-    [dx] "r" (dx),
-    [stride] "r" (sy * 4),
-    [final_out] "r" (final_out)
-  );
+  if (dx > 0) {
+    if (dx > dy) {
+      draw_line_clipped_x(out, dx, dy, 1, set);
+    } else {
+      draw_line_clipped_y(out, dx, dy, 1, set);
+    }
+  } else {
+    dx = -dx;
+    if (dx > dy) {
+      draw_line_clipped_x(out, dx, dy, -1, set);
+    } else {
+      draw_line_clipped_y(out, dx, dy, -1, set);
+    }
+  }
 }
 
 __attribute__((section(".ramcode")))

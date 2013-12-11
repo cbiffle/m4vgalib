@@ -1,5 +1,7 @@
 #include "vga/graphics_1.h"
 
+#define RAMCODE(sub) __attribute__((section(".ramcode." sub)))
+
 namespace vga {
 
 Graphics1::Graphics1(void *fb, unsigned w, unsigned h, unsigned s)
@@ -18,7 +20,7 @@ void Graphics1::clear_pixel(unsigned x, unsigned y) {
   *bit_addr(x, y) = 0;
 }
 
-__attribute__((section(".ramcode")))
+RAMCODE("Graphics1.bit_addr")
 unsigned *Graphics1::bit_addr(unsigned x, unsigned y) {
   unsigned offset = reinterpret_cast<unsigned>(_fb);
   unsigned bit_base = offset * 32 + 0x22000000;
@@ -39,7 +41,7 @@ enum {
   out_top = 8,
 };
 
-__attribute__((section(".ramcode")))
+RAMCODE("Graphics1.out_code.int")
 unsigned Graphics1::compute_out_code(int x, int y) {
   unsigned code = 0;
 
@@ -52,7 +54,7 @@ unsigned Graphics1::compute_out_code(int x, int y) {
   return code;
 }
 
-__attribute__((section(".ramcode")))
+RAMCODE("Graphics1.out_code.float")
 unsigned Graphics1::compute_out_code(float x, float y) {
   unsigned code = 0;
 
@@ -65,8 +67,7 @@ unsigned Graphics1::compute_out_code(float x, float y) {
   return code;
 }
 
-
-__attribute__((section(".ramcode")))
+RAMCODE("Graphics1.draw_line.int")
 void Graphics1::draw_line(int x1, int y1, int x2, int y2,
                           bool set) {
   unsigned code0 = compute_out_code(x1, y1);
@@ -106,7 +107,7 @@ void Graphics1::draw_line(int x1, int y1, int x2, int y2,
   draw_line_clipped(x1, y1, x2, y2, set);
 }
 
-__attribute__((section(".ramcode")))
+RAMCODE("Graphics1.draw_line.float")
 void Graphics1::draw_line(float x1, float y1, float x2, float y2,
                           bool set) {
   unsigned code0 = compute_out_code(x1, y1);
@@ -146,7 +147,7 @@ void Graphics1::draw_line(float x1, float y1, float x2, float y2,
   draw_line_clipped(x1 + 0.5f, y1 + 0.5f, x2 + 0.5f, y2 + 0.5f, set);
 }
 
-__attribute__((section(".ramcode")))
+RAMCODE("Graphics1.draw_line_clipped")
 void Graphics1::draw_line_clipped_x(unsigned *out, int dx, int dy, int dir,
                                     bool set) {
   int dy2 = dy * 2;
@@ -168,7 +169,7 @@ void Graphics1::draw_line_clipped_x(unsigned *out, int dx, int dy, int dir,
   }
 }
 
-__attribute__((section(".ramcode")))
+RAMCODE("Graphics1.draw_line_clipped")
 void Graphics1::draw_line_clipped_y(unsigned *out, int dx, int dy, int dir,
                                     bool set) {
   int dx2 = dx * 2;
@@ -190,7 +191,7 @@ void Graphics1::draw_line_clipped_y(unsigned *out, int dx, int dy, int dir,
   }
 }
 
-__attribute__((section(".ramcode")))
+RAMCODE("Graphics1.draw_line_clipped")
 void Graphics1::draw_line_clipped(int x0, int y0, int x1, int y1, bool set) {
   if (y0 > y1) {
     swap(x0, x1);
@@ -218,17 +219,17 @@ void Graphics1::draw_line_clipped(int x0, int y0, int x1, int y1, bool set) {
   }
 }
 
-__attribute__((section(".ramcode")))
+RAMCODE("Graphics1.set_line.int")
 void Graphics1::set_line(int x1, int y1, int x2, int y2) {
   draw_line(x1, y1, x2, y2, true);
 }
 
-__attribute__((section(".ramcode")))
+RAMCODE("Graphics1.clear_line.int")
 void Graphics1::clear_line(int x1, int y1, int x2, int y2) {
   draw_line(x1, y1, x2, y2, false);
 }
 
-__attribute__((section(".ramcode")))
+RAMCODE("Graphics1.clear_all")
 void Graphics1::clear_all() {
   unsigned *fb32 = static_cast<unsigned *>(_fb);
   unsigned *end = fb32 + _height_px * _stride_words;

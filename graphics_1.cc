@@ -53,6 +53,10 @@ unsigned Graphics1::compute_out_code(float x, float y) {
 
 template <typename T>
 inline unsigned Graphics1::compute_out_code_spec(T x, T y) {
+  /*
+   * Detect which edges of the screen this point is beyond,
+   * for Cohen-Sutherland clipping (below).
+   */
   unsigned code = 0;
 
   if (x < 0) code |= out_left;
@@ -82,11 +86,15 @@ static inline int round_to_nearest(float x) { return x + 0.5f; }
 
 template <typename T>
 inline void Graphics1::draw_line_spec(T x1, T y1, T x2, T y2, bool set) {
+  /*
+   * Clip the line to the viewport using Cohen-Sutherland
+   * clipping.
+   */
   unsigned code0 = compute_out_code(x1, y1);
   unsigned code1 = compute_out_code(x2, y2);
 
   while (code0 || code1) {
-    if (code0 & code1) return;
+    if (code0 & code1) return;  // Reject line; outside screen.
 
     unsigned code = code0 ? code0 : code1;
     T x, y;
@@ -123,6 +131,35 @@ inline void Graphics1::draw_line_spec(T x1, T y1, T x2, T y2, bool set) {
                     set);
 }
 
+RAMCODE("Graphics1.draw_line_clipped")
+void Graphics1::draw_line_clipped(int x0, int y0, int x1, int y1, bool set) {
+  // We only draw horizontal or downward lines.  Ensure this:
+  if (y0 > y1) {
+    swap(x0, x1);
+    swap(y0, y1);
+  }
+
+  int dx = x1 - x0;  // May be negative
+  int dy = y1 - y0;  // Nonnegative now
+
+  unsigned *out = bit_addr(x0, y0);
+
+  if (dx > 0) {  // Drawing to the left
+    if (dx > dy) {  // Primarily horizontal (X is major axis)
+      draw_line_clipped_spec<true>(out, dx, dy, 1, set);
+    } else {  // Primarily vertical (Y is major axis)
+      draw_line_clipped_spec<false>(out, dx, dy, 1, set);
+    }
+  } else {  // Drawing to the right/straight up
+    dx = -dx;  // dx is nonnegative now.
+    if (dx > dy) {  // Primarily horizontal (X is major axis)
+      draw_line_clipped_spec<true>(out, dx, dy, -1, set);
+    } else {  // Primarily vertical (Y is major axis)
+      draw_line_clipped_spec<false>(out, dx, dy, -1, set);
+    }
+  }
+}
+
 template <bool H>
 inline void Graphics1::draw_line_clipped_spec(unsigned *out, int dx, int dy,
                                               int dir, bool set) {
@@ -146,34 +183,6 @@ inline void Graphics1::draw_line_clipped_spec(unsigned *out, int dx, int dy,
     error += dminor2;
     out += major_step;
     *out = set;
-  }
-}
-
-RAMCODE("Graphics1.draw_line_clipped")
-void Graphics1::draw_line_clipped(int x0, int y0, int x1, int y1, bool set) {
-  if (y0 > y1) {
-    swap(x0, x1);
-    swap(y0, y1);
-  }
-
-  int dx = x1 - x0;
-  int dy = y1 - y0;  // Nonnegative now
-
-  unsigned *out = bit_addr(x0, y0);
-
-  if (dx > 0) {
-    if (dx > dy) {
-      draw_line_clipped_spec<true>(out, dx, dy, 1, set);
-    } else {
-      draw_line_clipped_spec<false>(out, dx, dy, 1, set);
-    }
-  } else {
-    dx = -dx;
-    if (dx > dy) {
-      draw_line_clipped_spec<true>(out, dx, dy, -1, set);
-    } else {
-      draw_line_clipped_spec<false>(out, dx, dy, -1, set);
-    }
   }
 }
 

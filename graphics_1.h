@@ -40,8 +40,6 @@ private:
   inline void draw_line_spec(T x1, T y1, T x2, T y2, bool set);
 
   void draw_line_clipped(int x1, int y1, int x2, int y2, bool set);
-  void draw_line_clipped_y(unsigned *start, int dx, int dy, int dir, bool set);
-  void draw_line_clipped_x(unsigned *start, int dx, int dy, int dir, bool set);
 
   template <bool H>
   inline void draw_line_clipped_spec(unsigned *, int, int, int, bool);

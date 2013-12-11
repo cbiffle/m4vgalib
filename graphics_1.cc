@@ -123,18 +123,6 @@ inline void Graphics1::draw_line_spec(T x1, T y1, T x2, T y2, bool set) {
                     set);
 }
 
-RAMCODE("Graphics1.draw_line_clipped")
-void Graphics1::draw_line_clipped_x(unsigned *out, int dx, int dy, int dir,
-                                    bool set) {
-  draw_line_clipped_spec<true>(out, dx, dy, dir, set);
-}
-
-RAMCODE("Graphics1.draw_line_clipped")
-void Graphics1::draw_line_clipped_y(unsigned *out, int dx, int dy, int dir,
-                                    bool set) {
-  draw_line_clipped_spec<false>(out, dx, dy, dir, set);
-}
-
 template <bool H>
 inline void Graphics1::draw_line_clipped_spec(unsigned *out, int dx, int dy,
                                               int dir, bool set) {
@@ -175,16 +163,16 @@ void Graphics1::draw_line_clipped(int x0, int y0, int x1, int y1, bool set) {
 
   if (dx > 0) {
     if (dx > dy) {
-      draw_line_clipped_x(out, dx, dy, 1, set);
+      draw_line_clipped_spec<true>(out, dx, dy, 1, set);
     } else {
-      draw_line_clipped_y(out, dx, dy, 1, set);
+      draw_line_clipped_spec<false>(out, dx, dy, 1, set);
     }
   } else {
     dx = -dx;
     if (dx > dy) {
-      draw_line_clipped_x(out, dx, dy, -1, set);
+      draw_line_clipped_spec<true>(out, dx, dy, -1, set);
     } else {
-      draw_line_clipped_y(out, dx, dy, -1, set);
+      draw_line_clipped_spec<false>(out, dx, dy, -1, set);
     }
   }
 }

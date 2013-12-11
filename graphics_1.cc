@@ -126,43 +126,37 @@ inline void Graphics1::draw_line_spec(T x1, T y1, T x2, T y2, bool set) {
 RAMCODE("Graphics1.draw_line_clipped")
 void Graphics1::draw_line_clipped_x(unsigned *out, int dx, int dy, int dir,
                                     bool set) {
-  int dy2 = dy * 2;
-  int dx2 = dx * 2;
-  int error = dy2 - dx;
-
-  unsigned stride = _width_px;
-
-  *out = set;
-
-  while (dx--) {
-    if (error >= 0) {
-      out += stride;
-      error -= dx2;
-    }
-    error += dy2;
-    out += dir;
-    *out = set;
-  }
+  draw_line_clipped_spec<true>(out, dx, dy, dir, set);
 }
 
 RAMCODE("Graphics1.draw_line_clipped")
 void Graphics1::draw_line_clipped_y(unsigned *out, int dx, int dy, int dir,
                                     bool set) {
-  int dx2 = dx * 2;
-  int dy2 = dy * 2;
-  int error = dx2 - dy;
+  draw_line_clipped_spec<false>(out, dx, dy, dir, set);
+}
 
-  unsigned stride = _width_px;
+template <bool H>
+inline void Graphics1::draw_line_clipped_spec(unsigned *out, int dx, int dy,
+                                              int dir, bool set) {
+  int dmajor = H ? dx : dy;
+  int dminor = H ? dy : dx;
+
+  int minor_step = H ? _width_px : dir;
+  int major_step = H ? dir : _width_px;
+
+  int dminor2 = dminor * 2;
+  int dmajor2 = dmajor * 2;
+  int error = dminor2 - dmajor;
 
   *out = set;
 
-  while (dy--) {
+  while (dmajor--) {
     if (error >= 0) {
-      out += dir;
-      error -= dy2;
+      out += minor_step;
+      error -= dmajor2;
     }
-    error += dx2;
-    out += stride;
+    error += dminor2;
+    out += major_step;
     *out = set;
   }
 }

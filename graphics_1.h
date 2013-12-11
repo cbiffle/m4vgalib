@@ -33,6 +33,11 @@ private:
 
   unsigned compute_out_code(int x, int y);
   unsigned compute_out_code(float x, float y);
+  template <typename T>
+  inline unsigned compute_out_code_spec(T x, T y);
+
+  template <typename T>
+  inline void draw_line_spec(T x1, T y1, T x2, T y2, bool set);
 
   void draw_line_clipped(int x1, int y1, int x2, int y2, bool set);
   void draw_line_clipped_y(unsigned *start, int dx, int dy, int dir, bool set);

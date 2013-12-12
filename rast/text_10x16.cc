@@ -30,10 +30,11 @@ __attribute__((section(".ramcode")))
 Rasterizer::LineShape Text_10x16::rasterize(unsigned line_number,
                                             Pixel *raster_target) {
   line_number -= _top_line;
-  if (line_number >= _rows * glyph_rows) return { 0, 0 };
 
   unsigned text_row = line_number / glyph_rows;
   unsigned row_in_glyph = line_number % glyph_rows;
+
+  if (text_row >= _rows) return { 0, 0 };
 
   unsigned const *src = _fb + _cols * text_row;
   unsigned char const *font = _font + row_in_glyph * chars_in_font;

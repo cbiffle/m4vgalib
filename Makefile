@@ -5,6 +5,7 @@ vga[type] := library
 
 vga[cc_files] := \
   arena.cc \
+  bitmap.cc \
   font_10x16.cc \
   graphics_1.cc \
   measurement.cc \

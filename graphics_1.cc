@@ -4,28 +4,25 @@
 
 namespace vga {
 
-Graphics1::Graphics1(void *fb, unsigned w, unsigned h, unsigned s)
-  : _fb(fb),
-    _width_px(w),
-    _height_px(h),
-    _stride_words(s) {}
+Graphics1::Graphics1(Bitmap b)
+  : _b(b) {}
 
 void Graphics1::set_pixel(unsigned x, unsigned y) {
-  if (x >= _width_px || y >= _height_px) return;
+  if (x >= _b.width_px || y >= _b.height_px) return;
   *bit_addr(x, y) = 1;
 }
 
 void Graphics1::clear_pixel(unsigned x, unsigned y) {
-  if (x >= _width_px || y >= _height_px) return;
+  if (x >= _b.width_px || y >= _b.height_px) return;
   *bit_addr(x, y) = 0;
 }
 
 RAMCODE("Graphics1.bit_addr")
 unsigned *Graphics1::bit_addr(unsigned x, unsigned y) {
-  unsigned offset = reinterpret_cast<unsigned>(_fb);
+  unsigned offset = reinterpret_cast<unsigned>(_b.base);
   unsigned bit_base = offset * 32 + 0x22000000;
 
-  return reinterpret_cast<unsigned *>(bit_base) + y * _width_px + x;
+  return reinterpret_cast<unsigned *>(bit_base) + y * _b.width_px + x;
 }
 
 static void swap(int &a, int &b) {
@@ -60,10 +57,10 @@ inline unsigned Graphics1::compute_out_code_spec(T x, T y) {
   unsigned code = 0;
 
   if (x < 0) code |= out_left;
-  else if (x >= static_cast<int>(_width_px)) code |= out_right;
+  else if (x >= static_cast<int>(_b.width_px)) code |= out_right;
 
   if (y < 0) code |= out_top;
-  else if (y >= static_cast<int>(_height_px)) code |= out_bottom;
+  else if (y >= static_cast<int>(_b.height_px)) code |= out_bottom;
 
   return code;
 }
@@ -100,14 +97,15 @@ inline void Graphics1::draw_line_spec(T x1, T y1, T x2, T y2, bool set) {
     T x, y;
 
     if (code & out_bottom) {
-      x = x1 + (x2 - x1) * (static_cast<int>(_height_px) - 1 - y1) / (y2 - y1);
-      y = _height_px - 1;
+      x = x1 + (x2 - x1) * (static_cast<int>(_b.height_px) - 1 - y1)
+                        / (y2 - y1);
+      y = _b.height_px - 1;
     } else if (code & out_top) {
       x = x1 + (x2 - x1) * -y1 / (y2 - y1);
       y = 0;
     } else if (code & out_right) {
-      y = y1 + (y2 - y1) * (static_cast<int>(_width_px) - 1 - x1) / (x2 - x1);
-      x = _width_px - 1;
+      y = y1 + (y2 - y1) * (static_cast<int>(_b.width_px) - 1 - x1) / (x2 - x1);
+      x = _b.width_px - 1;
     } else /*if (code & out_left)*/ {
       y = y1 + (y2 - y1) * (-x1) / (x2 - x1);
       x = 0;
@@ -166,8 +164,8 @@ inline void Graphics1::draw_line_clipped_spec(unsigned *out, int dx, int dy,
   int dmajor = H ? dx : dy;
   int dminor = H ? dy : dx;
 
-  int minor_step = H ? _width_px : dir;
-  int major_step = H ? dir : _width_px;
+  int minor_step = H ? _b.width_px : dir;
+  int major_step = H ? dir : _b.width_px;
 
   int dminor2 = dminor * 2;
   int dmajor2 = dmajor * 2;
@@ -198,8 +196,8 @@ void Graphics1::clear_line(int x1, int y1, int x2, int y2) {
 
 RAMCODE("Graphics1.clear_all")
 void Graphics1::clear_all() {
-  unsigned *fb32 = static_cast<unsigned *>(_fb);
-  unsigned *end = fb32 + _height_px * _stride_words;
+  unsigned *fb32 = static_cast<unsigned *>(_b.base);
+  unsigned *end = fb32 + _b.height_px * _b.stride_words;
   while (fb32 != end) *fb32++ = 0;
 }
 

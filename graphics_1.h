@@ -1,6 +1,8 @@
 #ifndef VGA_GRAPHICS_1_H
 #define VGA_GRAPHICS_1_H
 
+#include "vga/bitmap.h"
+
 namespace vga {
 
 /*
@@ -10,7 +12,7 @@ namespace vga {
  */
 class Graphics1 {
 public:
-  Graphics1(void *fb, unsigned width, unsigned height, unsigned stride_words);
+  Graphics1(Bitmap);
 
   void set_pixel(unsigned x, unsigned y);
   void clear_pixel(unsigned x, unsigned y);
@@ -24,10 +26,7 @@ public:
   void clear_all();
 
 private:
-  void *_fb;
-  unsigned _width_px;
-  unsigned _height_px;
-  unsigned _stride_words;
+  Bitmap _b;
 
   unsigned *bit_addr(unsigned x, unsigned y);
 

@@ -42,11 +42,20 @@ Rasterizer::LineShape Bitmap_1::rasterize(unsigned line_number, Pixel *target) {
   return { 0, _bytes_per_line * 8 };
 }
 
+Bitmap Bitmap_1::get_bg_bitmap() const {
+  return { _fb[!_page1],
+           _bytes_per_line * 8,
+           _lines,
+           _bytes_per_line / 4 };
+}
+
 Graphics1 Bitmap_1::make_bg_graphics() const {
   if (!can_bg_use_bitband()) while (1);
 
-  return Graphics1(_fb[!_page1], _bytes_per_line * 8, _lines,
-                                 _bytes_per_line / 4);
+  return Graphics1({ _fb[!_page1],
+                     _bytes_per_line * 8,
+                     _lines,
+                     _bytes_per_line / 4 });
 }
 
 void Bitmap_1::flip() {

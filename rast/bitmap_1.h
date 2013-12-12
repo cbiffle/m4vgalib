@@ -1,6 +1,7 @@
 #ifndef VGA_RAST_BITMAP_1_H
 #define VGA_RAST_BITMAP_1_H
 
+#include "vga/bitmap.h"
 #include "vga/rasterizer.h"
 #include "vga/graphics_1.h"
 
@@ -15,6 +16,7 @@ public:
   virtual LineShape rasterize(unsigned, Pixel *);
   virtual void deactivate();
 
+  Bitmap get_bg_bitmap() const;
   Graphics1 make_bg_graphics() const;
   void flip();
   void flip_now();

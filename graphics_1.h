@@ -29,6 +29,7 @@ private:
   Bitmap _b;
 
   unsigned *bit_addr(unsigned x, unsigned y);
+  unsigned *word_addr(unsigned x, unsigned y);
 
   unsigned compute_out_code(int x, int y);
   unsigned compute_out_code(float x, float y);

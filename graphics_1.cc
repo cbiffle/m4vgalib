@@ -17,6 +17,12 @@ void Graphics1::clear_pixel(unsigned x, unsigned y) {
   *bit_addr(x, y) = 0;
 }
 
+RAMCODE("Graphics1.word_addr")
+unsigned *Graphics1::word_addr(unsigned x, unsigned y) {
+  auto base32 = reinterpret_cast<unsigned *>(_b.base);
+  return &base32[y * _b.stride_words + x/32];
+}
+
 RAMCODE("Graphics1.bit_addr")
 unsigned *Graphics1::bit_addr(unsigned x, unsigned y) {
   unsigned offset = reinterpret_cast<unsigned>(_b.base);
@@ -196,9 +202,15 @@ void Graphics1::clear_line(int x1, int y1, int x2, int y2) {
 
 RAMCODE("Graphics1.clear_all")
 void Graphics1::clear_all() {
-  unsigned *fb32 = static_cast<unsigned *>(_b.base);
-  unsigned *end = fb32 + _b.height_px * _b.stride_words;
-  while (fb32 != end) *fb32++ = 0;
+  unsigned h = _b.height_px;
+  unsigned w = _b.width_px;
+
+  for (unsigned y = 0; y < h; ++y) {
+    unsigned *row = word_addr(0, y);
+    for (unsigned x = 0; x < w / 32; ++x) {
+      row[x] = 0;
+    }
+  }
 }
 
 }  // namespace vga

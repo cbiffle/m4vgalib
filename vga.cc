@@ -97,7 +97,8 @@ static unsigned char working_buffer[max_pixels_per_line];
 
 static Rasterizer::LineShape working_buffer_shape;
 
-static Rasterizer *line_rasterizers[max_lines];
+static Band const *band_list_head;
+static Band current_band;
 
 
 /*******************************************************************************
@@ -123,7 +124,7 @@ void init() {
 
   msigs_init();
 
-  for (auto &r : line_rasterizers) r = nullptr;
+  band_list_head = 0;
 
   sync_off();
   video_off();
@@ -240,14 +241,8 @@ void configure_timing(Timing const &timing) {
   sync_on();
 }
 
-void configure_band(unsigned start, unsigned length, Rasterizer *rasterizer) {
-  unsigned end = start + length;
-  if (end < start) return;
-  end = end >= max_lines ? max_lines - 1 : end;
-
-  for (unsigned i = start; i < end; ++i) {
-    line_rasterizers[i] = rasterizer;
-  }
+void configure_band_list(Band const *head) {
+  band_list_head = head;
 }
 
 void wait_for_vblank() {
@@ -380,7 +375,6 @@ RAM_CODE void stm32f4xx_tim8_cc_handler() {
     if (line == 0) {
       // Start of frame!  Time to stop displaying pixels.
       vga::state = vga::State::blank;
-      // TODO(cbiffle): latch configuration changes.
     } else if (line == timing.vsync_start_line
             || line == timing.vsync_end_line) {
       // Either edge of vsync pulse.
@@ -389,6 +383,11 @@ RAM_CODE void stm32f4xx_tim8_cc_handler() {
                     static_cast<unsigned short>(timing.video_start_line - 1)) {
       // Time to start generating the first scan buffer.
       vga::state = vga::State::starting;
+      if (vga::band_list_head) {
+        vga::current_band = *vga::band_list_head;
+      } else {
+        vga::current_band = { nullptr, 0, nullptr };
+      }
     } else if (line == timing.video_start_line) {
       // Time to start output.
       vga::state = vga::State::active;
@@ -402,6 +401,21 @@ RAM_CODE void stm32f4xx_tim8_cc_handler() {
 
     // Pend a PendSV to process hblank tasks.
     armv7m::scb.write_icsr(armv7m::Scb::icsr_value_t().with_pendsvset(true));
+  }
+}
+
+RAM_CODE
+static vga::Rasterizer *get_next_rasterizer() {
+  if (vga::current_band.line_count) {
+    --vga::current_band.line_count;
+    return vga::current_band.rasterizer;
+  } else {
+    if (vga::current_band.next) {
+      vga::current_band = *vga::current_band.next;
+      return get_next_rasterizer();
+    } else {
+      return nullptr;
+    }
   }
 }
 
@@ -427,7 +441,7 @@ void v7m_pend_sv_handler() {
     unsigned line = vga::current_line;
     if (line >= timing.video_start_line && line <= timing.video_end_line) {
       unsigned visible_line = line - timing.video_start_line;
-      vga::Rasterizer *r = vga::line_rasterizers[visible_line];
+      vga::Rasterizer *r = get_next_rasterizer();
       if (r) {
         vga::Rasterizer::LineShape shape = r->rasterize(visible_line,
                                                         vga::working_buffer);

@@ -16,7 +16,13 @@ void sync_on();
 
 void configure_timing(Timing const &);
 
-void configure_band(unsigned start, unsigned length, Rasterizer *);
+struct Band {
+  Rasterizer *rasterizer;
+  unsigned line_count;
+  Band const *next;
+};
+
+void configure_band_list(Band const *head);
 
 void wait_for_vblank();
 

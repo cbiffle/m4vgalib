@@ -125,20 +125,22 @@ void init() {
 
   for (auto &r : line_rasterizers) r = nullptr;
 
+  sync_off();
   video_off();
   arena_reset();
 }
 
-void video_off() {
-  // Tristate all output ports.
+void sync_off() {
   gpioc.set_mode((1 << 6) | (1 << 7), Gpio::Mode::input);
-  gpioc.set_pull((1 << 6) | (1 << 7), Gpio::Pull::none);
-
-  gpioe.set_mode(0xFF00, Gpio::Mode::input);
-  gpioe.set_pull(0xFF00, Gpio::Pull::none);
+  gpioc.set_pull((1 << 6) | (1 << 7), Gpio::Pull::down);
 }
 
-void video_on() {
+void video_off() {
+  gpioe.set_mode(0xFF00, Gpio::Mode::input);
+  gpioe.set_pull(0xFF00, Gpio::Pull::down);
+}
+
+void sync_on() {
   // Configure PC6 to produce hsync using TIM8_CH1
   gpioc.set_alternate_function(Gpio::p6, 3);
   gpioc.set_output_type(Gpio::p6, Gpio::OutputType::push_pull);
@@ -149,7 +151,9 @@ void video_on() {
   gpioc.set_output_type(Gpio::p7, Gpio::OutputType::push_pull);
   gpioc.set_output_speed(Gpio::p7, Gpio::OutputSpeed::fast_50mhz);
   gpioc.set_mode(Gpio::p7, Gpio::Mode::gpio);
+}
 
+void video_on() {
   // Configure the high byte of port E for parallel video.
   // Using 100MHz output speed gets slightly sharper transitions than 50MHz.
   gpioe.set_output_type(0xFF00, Gpio::OutputType::push_pull);
@@ -159,6 +163,7 @@ void video_on() {
 
 void configure_timing(Timing const &timing) {
   // Disable outputs during mode change.
+  sync_off();
   video_off();
 
   // Place TIM8 in reset, stopping all timing, and disable its interrupt.
@@ -232,8 +237,7 @@ void configure_timing(Timing const &timing) {
   enable_irq(Interrupt::tim8_cc);
   tim8.write_cr1(tim8.read_cr1().with_cen(true));
 
-  // Enable display and sync signals.
-  video_on();
+  sync_on();
 }
 
 void configure_band(unsigned start, unsigned length, Rasterizer *rasterizer) {

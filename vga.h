@@ -11,6 +11,9 @@ void init();
 void video_on();
 void video_off();
 
+void sync_off();
+void sync_on();
+
 void configure_timing(Timing const &);
 
 void configure_band(unsigned start, unsigned length, Rasterizer *);

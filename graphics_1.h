@@ -17,11 +17,14 @@ public:
   void set_pixel(unsigned x, unsigned y);
   void clear_pixel(unsigned x, unsigned y);
 
+  void set_line(int x1, int y1, int x2, int y2);
+  void set_line(float x1, float y1, float x2, float y2);
+
+  void clear_line(int x1, int y1, int x2, int y2);
+  void clear_line(float x1, float y1, float x2, float y2);
+
   void draw_line(int x1, int y1, int x2, int y2, bool set);
   void draw_line(float x1, float y1, float x2, float y2, bool set);
-
-  void set_line(int x1, int y1, int x2, int y2);
-  void clear_line(int x1, int y1, int x2, int y2);
 
   void clear_all();
 
@@ -36,13 +39,14 @@ private:
   template <typename T>
   inline unsigned compute_out_code_spec(T x, T y);
 
-  template <typename T>
-  inline void draw_line_spec(T x1, T y1, T x2, T y2, bool set);
+  template <bool S, typename T>
+  inline void draw_line_spec(T x1, T y1, T x2, T y2);
 
-  void draw_line_clipped(int x1, int y1, int x2, int y2, bool set);
+  template <bool S>
+  inline void draw_line_clipped(int x1, int y1, int x2, int y2);
 
-  template <bool H>
-  inline void draw_line_clipped_spec(unsigned *, int, int, int, bool);
+  template <bool S, bool H>
+  inline void draw_line_clipped_spec(unsigned *, int, int, int);
 };
 
 }  // namespace vga

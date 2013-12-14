@@ -71,24 +71,33 @@ inline unsigned Graphics1::compute_out_code_spec(T x, T y) {
   return code;
 }
 
-RAMCODE("Graphics1.draw_line.int")
-void Graphics1::draw_line(int x1, int y1, int x2, int y2,
-                          bool set) {
-  draw_line_spec(x1, y1, x2, y2, set);
+RAMCODE("Graphics1.set_line.int")
+void Graphics1::set_line(int x1, int y1, int x2, int y2) {
+  draw_line_spec<true>(x1, y1, x2, y2);
 }
 
-RAMCODE("Graphics1.draw_line.float")
-void Graphics1::draw_line(float x1, float y1, float x2, float y2,
-                          bool set) {
-  draw_line_spec(x1, y1, x2, y2, set);
+RAMCODE("Graphics1.set_line.float")
+void Graphics1::set_line(float x1, float y1, float x2, float y2) {
+  draw_line_spec<true>(x1, y1, x2, y2);
 }
+
+RAMCODE("Graphics1.clear_line.int")
+void Graphics1::clear_line(int x1, int y1, int x2, int y2) {
+  draw_line_spec<false>(x1, y1, x2, y2);
+}
+
+RAMCODE("Graphics1.clear_line.float")
+void Graphics1::clear_line(float x1, float y1, float x2, float y2) {
+  draw_line_spec<false>(x1, y1, x2, y2);
+}
+
 
 static inline int round_to_nearest(int x) { return x; }
 
 static inline int round_to_nearest(float x) { return x + 0.5f; }
 
-template <typename T>
-inline void Graphics1::draw_line_spec(T x1, T y1, T x2, T y2, bool set) {
+template <bool S, typename T>
+inline void Graphics1::draw_line_spec(T x1, T y1, T x2, T y2) {
   /*
    * Clip the line to the viewport using Cohen-Sutherland
    * clipping.
@@ -128,15 +137,14 @@ inline void Graphics1::draw_line_spec(T x1, T y1, T x2, T y2, bool set) {
     }
   }
 
-  draw_line_clipped(round_to_nearest(x1),
-                    round_to_nearest(y1),
-                    round_to_nearest(x2),
-                    round_to_nearest(y2),
-                    set);
+  draw_line_clipped<S>(round_to_nearest(x1),
+                       round_to_nearest(y1),
+                       round_to_nearest(x2),
+                       round_to_nearest(y2));
 }
 
-RAMCODE("Graphics1.draw_line_clipped")
-void Graphics1::draw_line_clipped(int x0, int y0, int x1, int y1, bool set) {
+template <bool S>
+inline void Graphics1::draw_line_clipped(int x0, int y0, int x1, int y1) {
   // We only draw horizontal or downward lines.  Ensure this:
   if (y0 > y1) {
     swap(x0, x1);
@@ -150,23 +158,23 @@ void Graphics1::draw_line_clipped(int x0, int y0, int x1, int y1, bool set) {
 
   if (dx > 0) {  // Drawing to the left
     if (dx > dy) {  // Primarily horizontal (X is major axis)
-      draw_line_clipped_spec<true>(out, dx, dy, 1, set);
+      draw_line_clipped_spec<S, true>(out, dx, dy, 1);
     } else {  // Primarily vertical (Y is major axis)
-      draw_line_clipped_spec<false>(out, dx, dy, 1, set);
+      draw_line_clipped_spec<S, false>(out, dx, dy, 1);
     }
   } else {  // Drawing to the right/straight up
     dx = -dx;  // dx is nonnegative now.
     if (dx > dy) {  // Primarily horizontal (X is major axis)
-      draw_line_clipped_spec<true>(out, dx, dy, -1, set);
+      draw_line_clipped_spec<S, true>(out, dx, dy, -1);
     } else {  // Primarily vertical (Y is major axis)
-      draw_line_clipped_spec<false>(out, dx, dy, -1, set);
+      draw_line_clipped_spec<S, false>(out, dx, dy, -1);
     }
   }
 }
 
-template <bool H>
+template <bool S, bool H>
 inline void Graphics1::draw_line_clipped_spec(unsigned *out, int dx, int dy,
-                                              int dir, bool set) {
+                                              int dir) {
   int dmajor = H ? dx : dy;
   int dminor = H ? dy : dx;
 
@@ -177,7 +185,7 @@ inline void Graphics1::draw_line_clipped_spec(unsigned *out, int dx, int dy,
   int dmajor2 = dmajor * 2;
   int error = dminor2 - dmajor;
 
-  *out = set;
+  *out = S;
 
   while (dmajor--) {
     if (error >= 0) {
@@ -186,18 +194,28 @@ inline void Graphics1::draw_line_clipped_spec(unsigned *out, int dx, int dy,
     }
     error += dminor2;
     out += major_step;
-    *out = set;
+    *out = S;
   }
 }
 
-RAMCODE("Graphics1.set_line.int")
-void Graphics1::set_line(int x1, int y1, int x2, int y2) {
-  draw_line(x1, y1, x2, y2, true);
+RAMCODE("Graphics1.draw_line.int")
+void Graphics1::draw_line(int x1, int y1, int x2, int y2,
+                          bool set) {
+  if (set) {
+    set_line(x1, y1, x2, y2);
+  } else {
+    clear_line(x1, y1, x2, y2);
+  }
 }
 
-RAMCODE("Graphics1.clear_line.int")
-void Graphics1::clear_line(int x1, int y1, int x2, int y2) {
-  draw_line(x1, y1, x2, y2, false);
+RAMCODE("Graphics1.draw_line.float")
+void Graphics1::draw_line(float x1, float y1, float x2, float y2,
+                          bool set) {
+  if (set) {
+    set_line(x1, y1, x2, y2);
+  } else {
+    clear_line(x1, y1, x2, y2);
+  }
 }
 
 RAMCODE("Graphics1.clear_all")

@@ -19,11 +19,6 @@ void Bitmap_1::activate(Timing const &) {
   _page1 = false;
   _clut[0] = 0;
   _clut[1] = 0xFF;
-
-  for (unsigned i = 0; i < _bytes_per_line * _lines; ++i) {
-    _fb[0][i] = 0;
-    _fb[1][i] = 0;
-  }
 }
 
 void Bitmap_1::deactivate() {

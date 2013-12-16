@@ -19,6 +19,7 @@ public:
   void put_char(unsigned col, unsigned row,
                 Pixel fore, Pixel back,
                 char c);
+  void put_packed(unsigned col, unsigned row, unsigned p);
 
 private:
   unsigned _cols;

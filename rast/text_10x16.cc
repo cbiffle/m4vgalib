@@ -60,7 +60,12 @@ void Text_10x16::clear_framebuffer(Pixel bg) {
 void Text_10x16::put_char(unsigned col, unsigned row,
                           Pixel fore, Pixel back,
                           char c) {
-  _fb[row * _cols + col] = (fore << 16) | (back << 8) | c;
+  put_packed(col, row, (fore << 16) | (back << 8) | c);
+}
+
+void Text_10x16::put_packed(unsigned col, unsigned row,
+                            unsigned p) {
+  _fb[row * _cols + col] = p;
 }
 
 }  // namespace rast

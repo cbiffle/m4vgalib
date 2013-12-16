@@ -269,138 +269,155 @@ void hblank_interrupt()
 /*******************************************************************************
  * Horizontal timing interrupt.
  */
+
+RAM_CODE
+__attribute__((noinline))
+static void start_of_active_video() {
+  vga::msig_a_toggle();
+  // CC2 indicates start of active video (end of back porch).
+  // This only matters in displayed states.
+  if (is_displayed_state(vga::state)) {
+    // Clear stream 1 flags (lifcr is a write-1-to-clear register).
+    dma2.write_lifcr(Dma::lifcr_value_t()
+                     .with_cdmeif1(true)
+                     .with_cteif1(true)
+                     .with_chtif1(true)
+                     .with_ctcif1(true));
+
+    auto &st = dma2.stream1;
+
+    // Prepare to transfer pixels as words, plus the final black word.
+    st.write_ndtr(vga::working_buffer_shape.length / 4 + 1);
+
+    // Set addresses.  Note that we're using memory as the peripheral side.
+    // This DMA controller is a little odd.
+    st.write_par(reinterpret_cast<Word>(&vga::scan_buffer));
+    st.write_m0ar(0x40021015);  // High byte of GPIOE ODR (hack hack)
+
+    // Configure FIFO.
+    st.write_fcr(Dma::Stream::fcr_value_t()
+                 .with_fth(Dma::Stream::fcr_value_t::fth_t::quarter)
+                 .with_dmdis(true)
+                 .with_feie(false));
+
+    /*
+     * Configure and enable the DMA stream.  The configuration used here
+     * deserves more discussion.
+     *
+     * As noted above, our "peripheral" is RAM and our "memory" is the GPIO
+     * unit.  In memory-to-memory mode (which we use) the distinction is
+     * not useful, since the peripherals are memory-mapped; the controller
+     * insists that "peripheral" be source and "memory" be destination in that
+     * mode.  The key here is that the transfer runs at full speed.  On the
+     * STM32F407 the transfer will not exceed one unit per 4 AHB cycles.  The
+     * reason for this is not obvious.
+     *
+     * Address incrementation on this chip is independent from whether an
+     * address is considered "peripheral" or "memory."  Here we auto-increment
+     * the peripheral address (to walk through the scan buffer) while leaving
+     * the memory address fixed (at the appropriate byte of the GPIO port).
+     *
+     * Because we're using memory-to-memory, the hardware enforces several
+     * restrictions:
+     *
+     *  1. We're stuck using DMA2.  DMA1 can't do it.
+     *  2. We're required to use the FIFO -- direct mode is verboten.
+     *  3. We can't use circular mode.  (Double-buffer mode appears permitted,
+     *     but I haven't tried it.)
+     *
+     * Fortunately we can tie the FIFO to a tree by giving it a really low
+     * threshold level.
+     *
+     * I have not experimented with burst modes, but I suspect they'll make
+     * the timing less regular.
+     *
+     * Note that the priority (pl field) is only used for arbitration between
+     * streams of the same DMA controller.  The STM32F4 does not provide any
+     * control over the AHB matrix arbitration scheme, unlike (say) the NXP
+     * LPC1788.  Shame, that.  It means we have to be very careful about our
+     * use of the bus matrix during scan-out.
+     */
+    typedef Dma::Stream::cr_value_t cr_t;
+    st.write_cr(Dma::Stream::cr_value_t()
+                // Originally chosen to play nice with TIM8.  Now, arbitrary.
+                .with_chsel(7)
+                .with_pl(cr_t::pl_t::very_high)
+                .with_dir(cr_t::dir_t::memory_to_memory)
+                // Input settings:
+                .with_pburst(Dma::Stream::BurstSize::single)
+                .with_psize(Dma::Stream::TransferSize::word)
+                .with_pinc(true)
+                // Output settings:
+                .with_mburst(Dma::Stream::BurstSize::single)
+                .with_msize(Dma::Stream::TransferSize::byte)
+                .with_minc(false)
+                // Look at all these options we don't use:
+                .with_dbm(false)
+                .with_pincos(false)
+                .with_circ(false)
+                .with_pfctrl(false)
+                .with_tcie(false)
+                .with_htie(false)
+                .with_teie(false)
+                .with_dmeie(false)
+                // Finally, enable.
+                .with_en(true));
+  }
+  vga::msig_a_toggle();
+}
+
+RAM_CODE
+static void end_of_active_video() {
+  vga::Timing const &timing = vga::current_timing;
+
+  // CC3 indicates end of active video (start of front porch).
+  unsigned line = vga::current_line;
+
+  if (line == 0) {
+    // Start of frame!  Time to stop displaying pixels.
+    vga::state = vga::State::blank;
+  } else if (line == timing.vsync_start_line
+          || line == timing.vsync_end_line) {
+    // Either edge of vsync pulse.
+    gpioc.toggle(Gpio::p7);
+  } else if (line ==
+                  static_cast<unsigned short>(timing.video_start_line - 1)) {
+    // Time to start generating the first scan buffer.
+    vga::state = vga::State::starting;
+    if (vga::band_list_head) {
+      vga::current_band = *vga::band_list_head;
+    } else {
+      vga::current_band = { nullptr, 0, nullptr };
+    }
+  } else if (line == timing.video_start_line) {
+    // Time to start output.
+    vga::state = vga::State::active;
+  } else if (line == static_cast<unsigned short>(timing.video_end_line - 1)) {
+    // Time to stop rendering new scan buffers.
+    vga::state = vga::State::finishing;
+    line = static_cast<unsigned>(-1);  // Make line roll over to zero.
+  }
+
+  vga::current_line = line + 1;
+
+  // Pend a PendSV to process hblank tasks.
+  armv7m::scb.write_icsr(armv7m::Scb::icsr_value_t().with_pendsvset(true));
+}
+
 RAM_CODE void stm32f4xx_tim8_cc_handler() {
   // We have to clear our interrupt flags, or this will recur.
   auto sr = tim8.read_sr();
-  tim8.write_sr(sr.with_cc2if(false).with_cc3if(false));
-
-  vga::Timing const &timing = vga::current_timing;
 
   if (sr.get_cc2if()) {
-    // CC2 indicates start of active video (end of back porch).
-    // This only matters in displayed states.
-    if (is_displayed_state(vga::state)) {
-      // Clear stream 1 flags (lifcr is a write-1-to-clear register).
-      dma2.write_lifcr(Dma::lifcr_value_t()
-                       .with_cdmeif1(true)
-                       .with_cteif1(true)
-                       .with_chtif1(true)
-                       .with_ctcif1(true));
-
-      auto &st = dma2.stream1;
-
-      // Prepare to transfer pixels as words, plus the final black word.
-      st.write_ndtr(vga::working_buffer_shape.length / 4 + 1);
-
-      // Set addresses.  Note that we're using memory as the peripheral side.
-      // This DMA controller is a little odd.
-      st.write_par(reinterpret_cast<Word>(&vga::scan_buffer));
-      st.write_m0ar(0x40021015);  // High byte of GPIOE ODR (hack hack)
-
-      // Configure FIFO.
-      st.write_fcr(Dma::Stream::fcr_value_t()
-                   .with_fth(Dma::Stream::fcr_value_t::fth_t::quarter)
-                   .with_dmdis(true)
-                   .with_feie(false));
-
-      /*
-       * Configure and enable the DMA stream.  The configuration used here
-       * deserves more discussion.
-       *
-       * As noted above, our "peripheral" is RAM and our "memory" is the GPIO
-       * unit.  In memory-to-memory mode (which we use) the distinction is
-       * not useful, since the peripherals are memory-mapped; the controller
-       * insists that "peripheral" be source and "memory" be destination in that
-       * mode.  The key here is that the transfer runs at full speed.  On the
-       * STM32F407 the transfer will not exceed one unit per 4 AHB cycles.  The
-       * reason for this is not obvious.
-       *
-       * Address incrementation on this chip is independent from whether an
-       * address is considered "peripheral" or "memory."  Here we auto-increment
-       * the peripheral address (to walk through the scan buffer) while leaving
-       * the memory address fixed (at the appropriate byte of the GPIO port).
-       *
-       * Because we're using memory-to-memory, the hardware enforces several
-       * restrictions:
-       *
-       *  1. We're stuck using DMA2.  DMA1 can't do it.
-       *  2. We're required to use the FIFO -- direct mode is verboten.
-       *  3. We can't use circular mode.  (Double-buffer mode appears permitted,
-       *     but I haven't tried it.)
-       *
-       * Fortunately we can tie the FIFO to a tree by giving it a really low
-       * threshold level.
-       *
-       * I have not experimented with burst modes, but I suspect they'll make
-       * the timing less regular.
-       *
-       * Note that the priority (pl field) is only used for arbitration between
-       * streams of the same DMA controller.  The STM32F4 does not provide any
-       * control over the AHB matrix arbitration scheme, unlike (say) the NXP
-       * LPC1788.  Shame, that.  It means we have to be very careful about our
-       * use of the bus matrix during scan-out.
-       */
-      typedef Dma::Stream::cr_value_t cr_t;
-      st.write_cr(Dma::Stream::cr_value_t()
-                  // Originally chosen to play nice with TIM8.  Now, arbitrary.
-                  .with_chsel(7)
-                  .with_pl(cr_t::pl_t::very_high)
-                  .with_dir(cr_t::dir_t::memory_to_memory)
-                  // Input settings:
-                  .with_pburst(Dma::Stream::BurstSize::single)
-                  .with_psize(Dma::Stream::TransferSize::word)
-                  .with_pinc(true)
-                  // Output settings:
-                  .with_mburst(Dma::Stream::BurstSize::single)
-                  .with_msize(Dma::Stream::TransferSize::byte)
-                  .with_minc(false)
-                  // Look at all these options we don't use:
-                  .with_dbm(false)
-                  .with_pincos(false)
-                  .with_circ(false)
-                  .with_pfctrl(false)
-                  .with_tcie(false)
-                  .with_htie(false)
-                  .with_teie(false)
-                  .with_dmeie(false)
-                  // Finally, enable.
-                  .with_en(true));
-    }
+    tim8.write_sr(sr.with_cc2if(false));
+    start_of_active_video();
+    return;
   }
 
   if (sr.get_cc3if()) {
-    // CC3 indicates end of active video (start of front porch).
-    unsigned line = vga::current_line;
-
-    if (line == 0) {
-      // Start of frame!  Time to stop displaying pixels.
-      vga::state = vga::State::blank;
-    } else if (line == timing.vsync_start_line
-            || line == timing.vsync_end_line) {
-      // Either edge of vsync pulse.
-      gpioc.toggle(Gpio::p7);
-    } else if (line ==
-                    static_cast<unsigned short>(timing.video_start_line - 1)) {
-      // Time to start generating the first scan buffer.
-      vga::state = vga::State::starting;
-      if (vga::band_list_head) {
-        vga::current_band = *vga::band_list_head;
-      } else {
-        vga::current_band = { nullptr, 0, nullptr };
-      }
-    } else if (line == timing.video_start_line) {
-      // Time to start output.
-      vga::state = vga::State::active;
-    } else if (line == static_cast<unsigned short>(timing.video_end_line - 1)) {
-      // Time to stop rendering new scan buffers.
-      vga::state = vga::State::finishing;
-      line = static_cast<unsigned>(-1);  // Make line roll over to zero.
-    }
-
-    vga::current_line = line + 1;
-
-    // Pend a PendSV to process hblank tasks.
-    armv7m::scb.write_icsr(armv7m::Scb::icsr_value_t().with_pendsvset(true));
+    tim8.write_sr(sr.with_cc3if(false));
+    end_of_active_video();
+    return;
   }
 }
 

@@ -37,6 +37,7 @@ using stm32f4xx::gpioe;
 using stm32f4xx::Interrupt;
 using stm32f4xx::rcc;
 using stm32f4xx::syscfg;
+using stm32f4xx::tim1;
 using stm32f4xx::tim8;
 using stm32f4xx::Word;
 
@@ -114,15 +115,18 @@ void init() {
   syscfg.write_cmpcr(syscfg.read_cmpcr().with_cmp_pd(true));
 
   // Turn a bunch of stuff on.
+  rcc.enable_clock(ApbPeripheral::tim1);
   rcc.enable_clock(ApbPeripheral::tim8);
   rcc.enable_clock(AhbPeripheral::gpioc);  // Sync signals
   rcc.enable_clock(AhbPeripheral::gpioe);  // Video
   rcc.enable_clock(AhbPeripheral::dma2);
 
-  // Hold TIM8 in reset until we do mode-setting.
+  // Hold TIM1/8 in reset until we do mode-setting.
+  rcc.enter_reset(ApbPeripheral::tim1);
   rcc.enter_reset(ApbPeripheral::tim8);
 
   set_irq_priority(Interrupt::tim8_cc, 0);
+  set_irq_priority(Interrupt::tim1_cc, 1);
   set_exception_priority(armv7m::Exception::pend_sv, 0xFF);
 
   msigs_init();
@@ -165,6 +169,34 @@ void video_on() {
   gpioe.set_mode(0xFF00, Gpio::Mode::gpio);
 }
 
+static void configure_timer(Timing const &timing,
+                            ApbPeripheral p,
+                            AdvTimer &tim) {
+  rcc.leave_reset(p);
+  tim.write_psc(4 - 1);  // Count in pixels, 1 pixel = 4 CCLK
+
+  tim.write_arr(timing.line_pixels - 1);
+  tim.write_ccr1(timing.sync_pixels);
+  tim.write_ccr2(timing.sync_pixels
+                 + timing.back_porch_pixels - timing.video_lead);
+  tim.write_ccr3(timing.sync_pixels
+                 + timing.back_porch_pixels + timing.video_pixels);
+
+  tim.write_ccmr1(AdvTimer::ccmr1_value_t()
+                  .with_oc1m(AdvTimer::OcMode::pwm1)
+                  .with_cc1s(AdvTimer::ccmr1_value_t::cc1s_t::output));
+
+  tim.write_bdtr(AdvTimer::bdtr_value_t()
+                 .with_ossr(true)
+                 .with_moe(true));
+
+  tim.write_ccer(AdvTimer::ccer_value_t()
+                 .with_cc1e(true)
+                 .with_cc1p(
+                     timing.hsync_polarity == Timing::Polarity::negative));
+
+}
+
 void configure_timing(Timing const &timing) {
   // Disable outputs during mode change.
   sync_off();
@@ -174,6 +206,10 @@ void configure_timing(Timing const &timing) {
   disable_irq(Interrupt::tim8_cc);
   rcc.enter_reset(ApbPeripheral::tim8);
   clear_pending_irq(Interrupt::tim8_cc);
+
+  disable_irq(Interrupt::tim1_cc);
+  rcc.enter_reset(ApbPeripheral::tim1);
+  clear_pending_irq(Interrupt::tim1_cc);
 
   // Busy-wait for pending DMA to complete.
   while (dma2.stream1.read_cr().get_en());
@@ -187,35 +223,33 @@ void configure_timing(Timing const &timing) {
                   .with_icen(true)
                   .with_prften(true));
 
-  // Configure TIM8 for horizontal sync generation.
-  rcc.leave_reset(ApbPeripheral::tim8);
-  tim8.write_psc(4 - 1);  // Count in pixels, 1 pixel = 4 CCLK
+  // Configure TIM1/8 for horizontal sync generation.
+  configure_timer(timing, ApbPeripheral::tim1, tim1);
+  configure_timer(timing, ApbPeripheral::tim8, tim8);
 
-  tim8.write_arr(timing.line_pixels - 1);
-  tim8.write_ccr1(timing.sync_pixels);
-  tim8.write_ccr2(timing.sync_pixels
-                  + timing.back_porch_pixels - timing.video_lead);
-  tim8.write_ccr3(timing.sync_pixels
-                  + timing.back_porch_pixels + timing.video_pixels);
+  // Adjust tim1's CC2 value back in time.
+  tim1.write_ccr2(static_cast<unsigned>(tim1.read_ccr2()) - 7);
 
-  tim8.write_ccmr1(AdvTimer::ccmr1_value_t()
-                   .with_oc1m(AdvTimer::OcMode::pwm1)
-                   .with_cc1s(AdvTimer::ccmr1_value_t::cc1s_t::output));
+  // Configure tim1 to distribute its enable signal as its trigger output.
+  tim1.write_cr2(AdvTimer::cr2_value_t()
+                 .with_mms(AdvTimer::cr2_value_t::mms_t::enable)
+                 .with_ccds(false));
 
-  tim8.write_bdtr(AdvTimer::bdtr_value_t()
-                  .with_ossr(true)
-                  .with_moe(true));
+  // Configure tim8 to trigger from tim1 and run forever.
+  tim8.write_smcr(AdvTimer::smcr_value_t()
+                  .with_ts(AdvTimer::smcr_value_t::ts_t::itr0)
+                  .with_sms(AdvTimer::smcr_value_t::sms_t::trigger));
 
-  tim8.write_ccer(AdvTimer::ccer_value_t()
-                  .with_cc1e(true)
-                  .with_cc1p(
-                      timing.hsync_polarity == Timing::Polarity::negative));
-
+  // Turn on tim8's interrupts.
   tim8.write_dier(AdvTimer::dier_value_t()
                   .with_cc2ie(true)    // Interrupt at start of active video.
                   .with_cc3ie(true));  // Interrupt at end of active video.
 
-  // Note: TIM8 is still not running.
+  // Turn on only one of tim1's
+  tim1.write_dier(AdvTimer::dier_value_t()
+                  .with_cc2ie(true));  // Interrupt at start of active video.
+
+  // Note: timers still not running.
 
   switch (timing.vsync_polarity) {
     case Timing::Polarity::positive: gpioc.clear(1 << 7); break;
@@ -227,6 +261,7 @@ void configure_timing(Timing const &timing) {
     working_buffer[i] = 0xFF;
     working_buffer[i + 1] = 0x00;
   }
+
   // Blank the final four pixels of the scan buffer.
   scan_buffer[timing.video_pixels + 0] = 0;
   scan_buffer[timing.video_pixels + 1] = 0;
@@ -237,13 +272,15 @@ void configure_timing(Timing const &timing) {
   current_line = 0;
   current_timing = timing;
 
-  // Halt TIM8 on debug.
+  // Halt both timers on debug.
   dbg.write_dbgmcu_apb2_fz(dbg.read_dbgmcu_apb2_fz()
-                           .with_dbg_tim8_stop(true));
+                           .with_dbg_tim8_stop(true)
+                           .with_dbg_tim1_stop(true));
 
-  // Start the timer.
+  // Start TIM1, which starts TIM8.
+  enable_irq(Interrupt::tim1_cc);
   enable_irq(Interrupt::tim8_cc);
-  tim8.write_cr1(tim8.read_cr1().with_cen(true));
+  tim1.write_cr1(tim1.read_cr1().with_cen(true));
 
   sync_on();
 }
@@ -409,6 +446,18 @@ static void end_of_active_video() {
 
   // Pend a PendSV to process hblank tasks.
   armv7m::scb.write_icsr(armv7m::Scb::icsr_value_t().with_pendsvset(true));
+}
+
+RAM_CODE void stm32f4xx_tim1_cc_handler() {
+  // We access this APB2 timer through the bridge on AHB1.  This implies
+  // both wait states and resource conflicts with scanout.  Get done fast.
+  tim1.write_sr(tim1.read_sr().with_cc2if(false));
+
+  // Idle the processor until preempted by any higher-priority interrupt.
+  // This ensures that the M4's D-code bus is available for exception entry.
+  // NOTE: this behaves correctly on the M4, but WFI is not guaranteed to
+  // actually do anything.
+  armv7m::wait_for_interrupt();
 }
 
 RAM_CODE void stm32f4xx_tim8_cc_handler() {

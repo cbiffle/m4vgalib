@@ -9,6 +9,7 @@
 #include "lib/stm32f4xx/adv_timer.h"
 #include "lib/stm32f4xx/ahb.h"
 #include "lib/stm32f4xx/apb.h"
+#include "lib/stm32f4xx/dbg.h"
 #include "lib/stm32f4xx/dma.h"
 #include "lib/stm32f4xx/flash.h"
 #include "lib/stm32f4xx/gpio.h"
@@ -25,6 +26,8 @@
 using stm32f4xx::AdvTimer;
 using stm32f4xx::AhbPeripheral;
 using stm32f4xx::ApbPeripheral;
+using stm32f4xx::Dbg;
+using stm32f4xx::dbg;
 using stm32f4xx::Dma;
 using stm32f4xx::dma2;
 using stm32f4xx::flash;
@@ -233,6 +236,10 @@ void configure_timing(Timing const &timing) {
   // Set up global state.
   current_line = 0;
   current_timing = timing;
+
+  // Halt TIM8 on debug.
+  dbg.write_dbgmcu_apb2_fz(dbg.read_dbgmcu_apb2_fz()
+                           .with_dbg_tim8_stop(true));
 
   // Start the timer.
   enable_irq(Interrupt::tim8_cc);

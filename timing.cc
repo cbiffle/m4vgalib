@@ -19,7 +19,7 @@ Timing const timing_vesa_640x480_60hz = {
   800,   // line_pixels
   96,    // sync_pixels
   48,    // back_porch_pixels
-  22,    // video_lead
+  25,    // video_lead
   640,   // video_pixels,
   Timing::Polarity::negative,
 
@@ -47,7 +47,7 @@ Timing const timing_vesa_800x600_60hz = {
   1056,  // line_pixels
   128,   // sync_pixels
   88,    // back_porch_pixels
-  19,    // video_lead
+  24,    // video_lead
   800,   // video_pixels,
   Timing::Polarity::positive,
 

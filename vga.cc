@@ -115,19 +115,27 @@ void init() {
   syscfg.write_cmpcr(syscfg.read_cmpcr().with_cmp_pd(true));
 
   // Turn a bunch of stuff on.
-  rcc.enable_clock(ApbPeripheral::tim1);
-  rcc.enable_clock(ApbPeripheral::tim8);
   rcc.enable_clock(AhbPeripheral::gpioc);  // Sync signals
   rcc.enable_clock(AhbPeripheral::gpioe);  // Video
   rcc.enable_clock(AhbPeripheral::dma2);
 
-  // Hold TIM1/8 in reset until we do mode-setting.
-  rcc.enter_reset(ApbPeripheral::tim1);
-  rcc.enter_reset(ApbPeripheral::tim8);
-
+  // Configure our interrupt priorities.  The scheme is:
+  //  TIM8 (horizontal) gets highest priority.
+  //  TIM1 (shock absorber) is set just lower.
+  //  PendSV (rendering, user code) is lowest.
+  // We could fit other stuff into the gaps later.
+  // Note that PendSV is set using ARMv7-M priorities (0-255) and the others are
+  // set using narrower SoC priorities (0-15).  This is a bit ugly.
   set_irq_priority(Interrupt::tim8_cc, 0);
   set_irq_priority(Interrupt::tim1_cc, 1);
   set_exception_priority(armv7m::Exception::pend_sv, 0xFF);
+
+  // Enable Flash cache and prefetching to try and reduce jitter.
+  // This only affects best-effort-level code, not anything realtime.
+  flash.write_acr(flash.read_acr()
+                  .with_dcen(true)
+                  .with_icen(true)
+                  .with_prften(true));
 
   msigs_init();
 
@@ -169,9 +177,14 @@ void video_on() {
   gpioe.set_mode(0xFF00, Gpio::Mode::gpio);
 }
 
-static void configure_timer(Timing const &timing,
-                            ApbPeripheral p,
-                            AdvTimer &tim) {
+/*
+ * Sets up one of the two horizontal timers, which share almost all of their
+ * init code.
+ */
+static void configure_h_timer(Timing const &timing,
+                              ApbPeripheral p,
+                              AdvTimer &tim) {
+  rcc.enable_clock(p);
   rcc.leave_reset(p);
   tim.write_psc(4 - 1);  // Count in pixels, 1 pixel = 4 CCLK
 
@@ -197,19 +210,27 @@ static void configure_timer(Timing const &timing,
 
 }
 
+/*
+ * Safely shut down a timer, so that we can reconfigure without interlocks.
+ */
+static void disable_h_timer(ApbPeripheral p,
+                            Interrupt irq) {
+  // Ensure that we'll receive no further interrupts.
+  disable_irq(irq);
+  // Ensure that the peripheral will generate no further interrupts.
+  rcc.enter_reset(p);
+  // In case of race condition between the above actions, clear any pending.
+  clear_pending_irq(irq);
+}
+
 void configure_timing(Timing const &timing) {
   // Disable outputs during mode change.
   sync_off();
   video_off();
 
-  // Place TIM8 in reset, stopping all timing, and disable its interrupt.
-  disable_irq(Interrupt::tim8_cc);
-  rcc.enter_reset(ApbPeripheral::tim8);
-  clear_pending_irq(Interrupt::tim8_cc);
-
-  disable_irq(Interrupt::tim1_cc);
-  rcc.enter_reset(ApbPeripheral::tim1);
-  clear_pending_irq(Interrupt::tim1_cc);
+  // Place the horizontal timers in reset, disabling interrupts.
+  disable_h_timer(ApbPeripheral::tim8, Interrupt::tim8_cc);
+  disable_h_timer(ApbPeripheral::tim1, Interrupt::tim1_cc);
 
   // Busy-wait for pending DMA to complete.
   while (dma2.stream1.read_cr().get_en());
@@ -217,15 +238,9 @@ void configure_timing(Timing const &timing) {
   // Switch to new CPU clock settings.
   rcc.configure_clocks(timing.clock_config);
 
-  // Enable Flash cache and prefetching to try and reduce jitter.
-  flash.write_acr(flash.read_acr()
-                  .with_dcen(true)
-                  .with_icen(true)
-                  .with_prften(true));
-
   // Configure TIM1/8 for horizontal sync generation.
-  configure_timer(timing, ApbPeripheral::tim1, tim1);
-  configure_timer(timing, ApbPeripheral::tim8, tim8);
+  configure_h_timer(timing, ApbPeripheral::tim1, tim1);
+  configure_h_timer(timing, ApbPeripheral::tim8, tim8);
 
   // Adjust tim1's CC2 value back in time.
   tim1.write_ccr2(static_cast<unsigned>(tim1.read_ccr2()) - 7);

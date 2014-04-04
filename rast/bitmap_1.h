@@ -26,17 +26,17 @@ public:
   void set_fg_color(Pixel);
   void set_bg_color(Pixel);
 
-  void *get_fg_buffer() const { return _fb[_page1]; }
-  void *get_bg_buffer() const { return _fb[!_page1]; }
+  etl::common::UInt32 *get_fg_buffer() const { return _fb[_page1]; }
+  etl::common::UInt32 *get_bg_buffer() const { return _fb[!_page1]; }
 
   bool can_fg_use_bitband() const;
   bool can_bg_use_bitband() const;
   void copy_bg_to_fg() const;
 
 private:
-  etl::common::UInt8 *_fb[2];
+  etl::common::UInt32 *_fb[2];
   unsigned _lines;
-  unsigned _bytes_per_line;
+  unsigned _words_per_line;
   unsigned _top_line;
   bool _page1;
   Pixel _clut[2];

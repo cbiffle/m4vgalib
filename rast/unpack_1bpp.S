@@ -14,18 +14,18 @@
 @ 1bpp pixel unpacker using two-color lookup table.
 @
 @ Arguments:
-@  r0  start of input line containing 1bpp packed pixels.
+@  r0  start of input line containing 1bpp packed pixels (word-aligned)
 @  r1  CLUT pointer to two bytes: the zero color and high color.
 @  r2  output scan buffer.
-@  r3  width of input line in bytes.
-.global _ZN3vga4rast16unpack_1bpp_implEPKvPKhPhj
+@  r3  width of input line in words.
+.global _ZN3vga4rast16unpack_1bpp_implEPKjPKhPhj
 .thumb_func
-_ZN3vga4rast16unpack_1bpp_implEPKvPKhPhj:
+_ZN3vga4rast16unpack_1bpp_implEPKjPKhPhj:
       @ Name the arguments...
       framebuffer .req r0
       clut        .req r1
       target      .req r2
-      bytes       .req r3
+      words       .req r3
 
       @ Name temporaries...
       vclut0      .req r4
@@ -97,7 +97,7 @@ _ZN3vga4rast16unpack_1bpp_implEPKvPKhPhj:
       UNPACK_FOUR_PIXELS    @ Pixels 20-23                                  5
       UNPACK_FOUR_PIXELS    @ Pixels 24-27                                  5
       UNPACK_FOUR_PIXELS 1  @ Pixels 28-31                                  4
-      subs bytes, #4                                                      @ 1
+      subs words, #1                                                      @ 1
       bhi 0b                                                              @ 3/1
 
       @ Total cycles for loop body:                                        46/44

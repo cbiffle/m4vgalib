@@ -5,20 +5,19 @@
 #include "vga/rast/unpack_1bpp.h"
 
 using etl::armv7m::Word;
-using etl::common::UInt8;
+using etl::common::UInt32;
 
 namespace vga {
 namespace rast {
 
 Bitmap_1::Bitmap_1(unsigned width, unsigned height, unsigned top_line)
   : _lines(height),
-    _bytes_per_line(width / 8),
+    _words_per_line(width / 32),
     _top_line(top_line) {}
 
-
 void Bitmap_1::activate(Timing const &) {
-  _fb[0] = new UInt8[_bytes_per_line * _lines];
-  _fb[1] = new UInt8[_bytes_per_line * _lines];
+  _fb[0] = new UInt32[_words_per_line * _lines];
+  _fb[1] = new UInt32[_words_per_line * _lines];
   _page1 = false;
   _clut[0] = 0;
   _clut[1] = 0xFF;
@@ -33,27 +32,24 @@ Rasterizer::LineShape Bitmap_1::rasterize(unsigned line_number, Pixel *target) {
   line_number -= _top_line;
   if (line_number >= _lines) return { 0, 0 };
 
-  UInt8 const *src = _fb[_page1] + _bytes_per_line * line_number;
+  UInt32 const *src = _fb[_page1] + _words_per_line * line_number;
 
-  unpack_1bpp_impl(src, _clut, target, _bytes_per_line);
+  unpack_1bpp_impl(src, _clut, target, _words_per_line);
 
-  return { 0, _bytes_per_line * 8 };
+  return { 0, _words_per_line * 32 };
 }
 
 Bitmap Bitmap_1::get_bg_bitmap() const {
   return { _fb[!_page1],
-           _bytes_per_line * 8,
+           _words_per_line * 32,
            _lines,
-           _bytes_per_line / 4 };
+           _words_per_line };
 }
 
 Graphics1 Bitmap_1::make_bg_graphics() const {
   if (!can_bg_use_bitband()) while (1);
 
-  return Graphics1({ _fb[!_page1],
-                     _bytes_per_line * 8,
-                     _lines,
-                     _bytes_per_line / 4 });
+  return Graphics1(get_bg_bitmap());
 }
 
 void Bitmap_1::flip() {
@@ -78,9 +74,9 @@ bool Bitmap_1::can_bg_use_bitband() const {
 }
 
 void Bitmap_1::copy_bg_to_fg() const {
-  copy_words(reinterpret_cast<Word *>((void *) _fb[!_page1]),
-             reinterpret_cast<Word *>((void *) _fb[_page1]),
-             _bytes_per_line * _lines / 4);
+  copy_words(_fb[!_page1],
+             _fb[_page1],
+             _words_per_line * _lines);
 }
 
 void Bitmap_1::set_fg_color(Pixel c) {

@@ -28,22 +28,17 @@ _ZN3vga4rast21unpack_direct_x4_implEPKvPhj:
 
       @ Go!
 0:    ldr pixels, [framebuffer], #4
-      
-      uxtb pixel, pixels
-      mul pixel, magic
-      str pixel, [target], #4
 
-      uxtb pixel, pixels, ROR #8
+    .macro output_from_bit n
+      uxtb pixel, pixels, ROR #\n
       mul pixel, magic
       str pixel, [target], #4
+    .endm
 
-      uxtb pixel, pixels, ROR #16
-      mul pixel, magic
-      str pixel, [target], #4
-
-      uxtb pixel, pixels, ROR #24
-      mul pixel, magic
-      str pixel, [target], #4
+      output_from_bit 0
+      output_from_bit 8
+      output_from_bit 16
+      output_from_bit 24
 
       subs bytes, #4
       bhi 0b

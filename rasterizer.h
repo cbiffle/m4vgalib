@@ -1,6 +1,8 @@
 #ifndef VGA_RASTERIZER_H
 #define VGA_RASTERIZER_H
 
+#include "etl/common/types.h"
+
 namespace vga {
 
 struct Timing;
@@ -13,7 +15,7 @@ struct Timing;
  */
 class Rasterizer {
 public:
-  typedef unsigned char Pixel;
+  typedef etl::common::UInt8 Pixel;
 
   /*
    * Implementations of rasterize return a LineShape.  This lets them render

@@ -1,10 +1,14 @@
 #include "vga/vga.h"
 
+#include "etl/common/types.h"
+#include "etl/common/size.h"
+
 #include "lib/common/attribute_macros.h"
 #include "etl/armv7m/exceptions.h"
 #include "etl/armv7m/exception_table.h"
 #include "etl/armv7m/instructions.h"
 #include "etl/armv7m/scb.h"
+#include "etl/armv7m/types.h"
 
 #include "etl/stm32f4xx/rcc.h"
 
@@ -25,8 +29,12 @@
 #include "vga/measurement.h"
 #include "vga/rasterizer.h"
 
+using etl::common::Size;
+using etl::common::UInt8;
+
 using etl::armv7m::Scb;
 using etl::armv7m::scb;
+using etl::armv7m::Word;
 
 using etl::stm32f4xx::AdvTimer;
 using etl::stm32f4xx::AhbPeripheral;
@@ -44,7 +52,6 @@ using etl::stm32f4xx::rcc;
 using etl::stm32f4xx::syscfg;
 using etl::stm32f4xx::tim1;
 using etl::stm32f4xx::tim8;
-using etl::stm32f4xx::Word;
 
 #define IN_SCAN_RAM SECTION(".vga_scan_ram")
 #define IN_LOCAL_RAM SECTION(".vga_local_ram")
@@ -96,13 +103,13 @@ static State volatile state;
 // It's aligned for DMA.
 // It contains four trailing pixels that are kept black for blanking.
 ALIGNED(4) IN_SCAN_RAM
-static unsigned char scan_buffer[max_pixels_per_line + 4];
+static Pixel scan_buffer[max_pixels_per_line + 4];
 
 // This is the intermediate buffer used during rasterization.
 // It should be close to the CPU and need not be DMA-capable.
 // It's aligned to make copying it more efficient.
 ALIGNED(4) IN_LOCAL_RAM
-static unsigned char working_buffer[max_pixels_per_line];
+static Pixel working_buffer[max_pixels_per_line];
 
 static Rasterizer::LineShape working_buffer_shape;
 
@@ -248,7 +255,7 @@ void configure_timing(Timing const &timing) {
   configure_h_timer(timing, ApbPeripheral::tim8, tim8);
 
   // Adjust tim1's CC2 value back in time.
-  tim1.write_ccr2(static_cast<unsigned>(tim1.read_ccr2()) - 7);
+  tim1.write_ccr2(static_cast<Word>(tim1.read_ccr2()) - 7);
 
   // Configure tim1 to distribute its enable signal as its trigger output.
   tim1.write_cr2(AdvTimer::cr2_value_t()
@@ -277,7 +284,7 @@ void configure_timing(Timing const &timing) {
   }
 
   // Scribble over working buffer to help catch bugs.
-  for (unsigned i = 0; i < sizeof(working_buffer); i += 2) {
+  for (Size i = 0; i < sizeof(working_buffer); i += 2) {
     working_buffer[i] = 0xFF;
     working_buffer[i + 1] = 0x00;
   }
@@ -523,7 +530,7 @@ void etl_armv7m_pend_sv_handler() {
     // PendSV.
     // Note that GCC can't see that we've aligned the buffers correctly, so we
     // have to do a multi-cast dance. :-/
-    ((unsigned *) (void *) vga::scan_buffer)[
+    ((Word *) (void *) vga::scan_buffer)[
         vga::working_buffer_shape.length / 4] = 0;
     copy_words(reinterpret_cast<Word const *>(
                    static_cast<void *>(vga::working_buffer)),

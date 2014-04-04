@@ -1,6 +1,8 @@
 #ifndef VGA_BITMAP_H
 #define VGA_BITMAP_H
 
+#include "etl/armv7m/types.h"
+
 namespace vga {
 
 struct Bitmap {
@@ -9,8 +11,8 @@ struct Bitmap {
   unsigned height_px;
   int stride_words;
 
-  unsigned *word_addr(unsigned x, unsigned y) const {
-    unsigned *b = static_cast<unsigned *>(base);
+  etl::armv7m::Word *word_addr(unsigned x, unsigned y) const {
+    unsigned *b = static_cast<etl::armv7m::Word *>(base);
     return &b[y * stride_words + x/32];
   }
 

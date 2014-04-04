@@ -1,6 +1,8 @@
 #ifndef VGA_RAST_BITMAP_1_H
 #define VGA_RAST_BITMAP_1_H
 
+#include "etl/common/types.h"
+
 #include "vga/bitmap.h"
 #include "vga/rasterizer.h"
 #include "vga/graphics_1.h"
@@ -32,7 +34,7 @@ public:
   void copy_bg_to_fg() const;
 
 private:
-  unsigned char *_fb[2];
+  etl::common::UInt8 *_fb[2];
   unsigned _lines;
   unsigned _bytes_per_line;
   unsigned _top_line;

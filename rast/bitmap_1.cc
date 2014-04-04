@@ -5,6 +5,7 @@
 #include "vga/rast/unpack_1bpp.h"
 
 using etl::armv7m::Word;
+using etl::common::UInt8;
 
 namespace vga {
 namespace rast {
@@ -16,8 +17,8 @@ Bitmap_1::Bitmap_1(unsigned width, unsigned height, unsigned top_line)
 
 
 void Bitmap_1::activate(Timing const &) {
-  _fb[0] = new unsigned char[_bytes_per_line * _lines];
-  _fb[1] = new unsigned char[_bytes_per_line * _lines];
+  _fb[0] = new UInt8[_bytes_per_line * _lines];
+  _fb[1] = new UInt8[_bytes_per_line * _lines];
   _page1 = false;
   _clut[0] = 0;
   _clut[1] = 0xFF;
@@ -32,7 +33,7 @@ Rasterizer::LineShape Bitmap_1::rasterize(unsigned line_number, Pixel *target) {
   line_number -= _top_line;
   if (line_number >= _lines) return { 0, 0 };
 
-  unsigned char const *src = _fb[_page1] + _bytes_per_line * line_number;
+  UInt8 const *src = _fb[_page1] + _bytes_per_line * line_number;
 
   unpack_1bpp_impl(src, _clut, target, _bytes_per_line);
 

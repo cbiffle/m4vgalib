@@ -27,6 +27,7 @@ vga[S_files] := \
 vga[cc_flags] := -std=gnu++0x -O2
 
 vga[libs] := \
+  etl/common:common \
   lib/stm32f4xx:stm32f4xx
 
 include $(depth)/build/Makefile.rules

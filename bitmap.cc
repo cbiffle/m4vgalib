@@ -1,8 +1,8 @@
 #include "vga/bitmap.h"
 
-#include "lib/common/algorithm.h"
+#include "etl/common/algorithm.h"
 
-using common::min;
+using etl::common::min;
 
 #define INVARIANT(c) while (!(c)) {}
 #define PRE(c) while (!(c)) {}
@@ -40,7 +40,7 @@ static void bitrow_almost_aligned(unsigned const *source,
                                   unsigned start_bit,
                                   unsigned bit_count) {
   PRE(start_bit < 32);
-  unsigned bits = common::min(32u - start_bit, bit_count);
+  unsigned bits = min(32u - start_bit, bit_count);
   unsigned mask = maskbits(bits) << start_bit;
   *dest = (*dest & ~mask) | (*source & mask);
   

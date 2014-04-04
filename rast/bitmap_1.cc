@@ -4,6 +4,8 @@
 #include "vga/vga.h"
 #include "vga/unpack_1bpp.h"
 
+using etl::armv7m::Word;
+
 namespace vga {
 namespace rast {
 
@@ -75,8 +77,8 @@ bool Bitmap_1::can_bg_use_bitband() const {
 }
 
 void Bitmap_1::copy_bg_to_fg() const {
-  copy_words(reinterpret_cast<armv7m::Word *>((void *) _fb[!_page1]),
-             reinterpret_cast<armv7m::Word *>((void *) _fb[_page1]),
+  copy_words(reinterpret_cast<Word *>((void *) _fb[!_page1]),
+             reinterpret_cast<Word *>((void *) _fb[_page1]),
              _bytes_per_line * _lines / 4);
 }
 

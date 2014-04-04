@@ -1,7 +1,7 @@
 #ifndef VGA_TIMING_H
 #define VGA_TIMING_H
 
-#include "lib/stm32f4xx/rcc.h"
+#include "etl/stm32f4xx/rcc.h"
 
 namespace vga {
 
@@ -22,7 +22,7 @@ struct Timing {
    * AHB) frequency.  The clock_config specifies how to achieve the desired
    * CPU clock, and thus implicitly defines the CPU clock.
    */
-  stm32f4xx::ClockConfig clock_config;
+  etl::stm32f4xx::ClockConfig clock_config;
 
   /*
    * Horizontal timing.

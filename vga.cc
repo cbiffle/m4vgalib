@@ -1,21 +1,23 @@
 #include "vga/vga.h"
 
 #include "lib/common/attribute_macros.h"
-#include "lib/armv7m/exceptions.h"
-#include "lib/armv7m/exception_table.h"
-#include "lib/armv7m/instructions.h"
-#include "lib/armv7m/scb.h"
+#include "etl/armv7m/exceptions.h"
+#include "etl/armv7m/exception_table.h"
+#include "etl/armv7m/instructions.h"
+#include "etl/armv7m/scb.h"
 
-#include "lib/stm32f4xx/adv_timer.h"
-#include "lib/stm32f4xx/ahb.h"
-#include "lib/stm32f4xx/apb.h"
-#include "lib/stm32f4xx/dbg.h"
-#include "lib/stm32f4xx/dma.h"
-#include "lib/stm32f4xx/flash.h"
-#include "lib/stm32f4xx/gpio.h"
-#include "lib/stm32f4xx/interrupts.h"
-#include "lib/stm32f4xx/rcc.h"
-#include "lib/stm32f4xx/syscfg.h"
+#include "etl/stm32f4xx/rcc.h"
+
+#include "etl/stm32f4xx/adv_timer.h"
+#include "etl/stm32f4xx/ahb.h"
+#include "etl/stm32f4xx/apb.h"
+#include "etl/stm32f4xx/dbg.h"
+#include "etl/stm32f4xx/dma.h"
+#include "etl/stm32f4xx/flash.h"
+#include "etl/stm32f4xx/gpio.h"
+#include "etl/stm32f4xx/interrupt_table.h"
+#include "etl/stm32f4xx/interrupts.h"
+#include "etl/stm32f4xx/syscfg.h"
 
 #include "vga/arena.h"
 #include "vga/copy_words.h"
@@ -23,23 +25,26 @@
 #include "vga/measurement.h"
 #include "vga/rasterizer.h"
 
-using stm32f4xx::AdvTimer;
-using stm32f4xx::AhbPeripheral;
-using stm32f4xx::ApbPeripheral;
-using stm32f4xx::Dbg;
-using stm32f4xx::dbg;
-using stm32f4xx::Dma;
-using stm32f4xx::dma2;
-using stm32f4xx::flash;
-using stm32f4xx::Gpio;
-using stm32f4xx::gpioc;
-using stm32f4xx::gpioe;
-using stm32f4xx::Interrupt;
-using stm32f4xx::rcc;
-using stm32f4xx::syscfg;
-using stm32f4xx::tim1;
-using stm32f4xx::tim8;
-using stm32f4xx::Word;
+using etl::armv7m::Scb;
+using etl::armv7m::scb;
+
+using etl::stm32f4xx::AdvTimer;
+using etl::stm32f4xx::AhbPeripheral;
+using etl::stm32f4xx::ApbPeripheral;
+using etl::stm32f4xx::Dbg;
+using etl::stm32f4xx::dbg;
+using etl::stm32f4xx::Dma;
+using etl::stm32f4xx::dma2;
+using etl::stm32f4xx::flash;
+using etl::stm32f4xx::Gpio;
+using etl::stm32f4xx::gpioc;
+using etl::stm32f4xx::gpioe;
+using etl::stm32f4xx::Interrupt;
+using etl::stm32f4xx::rcc;
+using etl::stm32f4xx::syscfg;
+using etl::stm32f4xx::tim1;
+using etl::stm32f4xx::tim8;
+using etl::stm32f4xx::Word;
 
 #define IN_SCAN_RAM SECTION(".vga_scan_ram")
 #define IN_LOCAL_RAM SECTION(".vga_local_ram")
@@ -128,7 +133,7 @@ void init() {
   // set using narrower SoC priorities (0-15).  This is a bit ugly.
   set_irq_priority(Interrupt::tim8_cc, 0);
   set_irq_priority(Interrupt::tim1_cc, 1);
-  set_exception_priority(armv7m::Exception::pend_sv, 0xFF);
+  scb.set_exception_priority(etl::armv7m::Exception::pend_sv, 0xFF);
 
   // Enable Flash cache and prefetching to try and reduce jitter.
   // This only affects best-effort-level code, not anything realtime.
@@ -305,7 +310,7 @@ void configure_band_list(Band const *head) {
 }
 
 void wait_for_vblank() {
-  while (!in_vblank()) armv7m::wait_for_interrupt();
+  while (!in_vblank()) etl::armv7m::wait_for_interrupt();
 }
 
 bool in_vblank() {
@@ -313,7 +318,7 @@ bool in_vblank() {
 }
 
 void sync_to_vblank() {
-  while (in_vblank()) armv7m::wait_for_interrupt();
+  while (in_vblank()) etl::armv7m::wait_for_interrupt();
   wait_for_vblank();
 }
 
@@ -460,10 +465,10 @@ static void end_of_active_video() {
   vga::current_line = line + 1;
 
   // Pend a PendSV to process hblank tasks.
-  armv7m::scb.write_icsr(armv7m::Scb::icsr_value_t().with_pendsvset(true));
+  scb.write_icsr(Scb::icsr_value_t().with_pendsvset(true));
 }
 
-RAM_CODE void stm32f4xx_tim1_cc_handler() {
+RAM_CODE void etl_stm32f4xx_tim1_cc_handler() {
   // We access this APB2 timer through the bridge on AHB1.  This implies
   // both wait states and resource conflicts with scanout.  Get done fast.
   tim1.write_sr(tim1.read_sr().with_cc2if(false));
@@ -472,10 +477,10 @@ RAM_CODE void stm32f4xx_tim1_cc_handler() {
   // This ensures that the M4's D-code bus is available for exception entry.
   // NOTE: this behaves correctly on the M4, but WFI is not guaranteed to
   // actually do anything.
-  armv7m::wait_for_interrupt();
+  etl::armv7m::wait_for_interrupt();
 }
 
-RAM_CODE void stm32f4xx_tim8_cc_handler() {
+RAM_CODE void etl_stm32f4xx_tim8_cc_handler() {
   // We have to clear our interrupt flags, or this will recur.
   auto sr = tim8.read_sr();
 
@@ -508,7 +513,7 @@ static vga::Rasterizer *get_next_rasterizer() {
 }
 
 RAM_CODE
-void v7m_pend_sv_handler() {
+void etl_armv7m_pend_sv_handler() {
   vga::hblank_interrupt();
 
   if (is_rendered_state(vga::state)) {

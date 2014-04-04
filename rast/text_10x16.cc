@@ -2,7 +2,7 @@
 
 #include "vga/timing.h"
 #include "vga/font_10x16.h"
-#include "vga/unpack_text_10p_attributed.h"
+#include "vga/rast/unpack_text_10p_attributed.h"
 
 namespace vga {
 namespace rast {

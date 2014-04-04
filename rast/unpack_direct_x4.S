@@ -7,9 +7,9 @@
 @  r0  start of input line containing pixels.
 @  r1  output scan buffer.
 @  r2  width of input line in pixels (bytes).
-.global _ZN3vga21unpack_direct_x4_implEPKvPhj
+.global _ZN3vga4rast21unpack_direct_x4_implEPKvPhj
 .thumb_func
-_ZN3vga21unpack_direct_x4_implEPKvPhj:
+_ZN3vga4rast21unpack_direct_x4_implEPKvPhj:
       @ Name the arguments...
       framebuffer .req r0
       target      .req r1

@@ -2,7 +2,7 @@
 
 #include "vga/copy_words.h"
 #include "vga/vga.h"
-#include "vga/unpack_direct_x4.h"
+#include "vga/rast/unpack_direct_x4.h"
 
 namespace vga {
 namespace rast {

@@ -2,7 +2,7 @@
 
 #include "vga/copy_words.h"
 #include "vga/vga.h"
-#include "vga/unpack_1bpp.h"
+#include "vga/rast/unpack_1bpp.h"
 
 using etl::armv7m::Word;
 

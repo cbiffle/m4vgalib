@@ -18,9 +18,9 @@
 @  r1  CLUT pointer to two bytes: the zero color and high color.
 @  r2  output scan buffer.
 @  r3  width of input line in bytes.
-.global _ZN3vga16unpack_1bpp_implEPKvPKhPhj
+.global _ZN3vga4rast16unpack_1bpp_implEPKvPKhPhj
 .thumb_func
-_ZN3vga16unpack_1bpp_implEPKvPKhPhj:
+_ZN3vga4rast16unpack_1bpp_implEPKvPKhPhj:
       @ Name the arguments...
       framebuffer .req r0
       clut        .req r1

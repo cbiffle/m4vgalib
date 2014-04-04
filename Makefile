@@ -20,9 +20,9 @@ vga[cc_files] := \
 vga[S_files] := \
   copy_words.S \
   graphics_1_assist.S \
-  unpack_1bpp.S \
-  unpack_direct_x4.S \
-  unpack_text_10p_attributed.S
+  rast/unpack_1bpp.S \
+  rast/unpack_direct_x4.S \
+  rast/unpack_text_10p_attributed.S
 
 vga[cc_flags] := -std=gnu++0x -O2
 

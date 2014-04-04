@@ -42,9 +42,9 @@
 @  r2  output raster target.
 @  r3  width of line in text columns (4 bytes in input, 10 pixels in output).
 @
-.global _ZN3vga31unpack_text_10p_attributed_implEPKvPKhPhj
+.global _ZN3vga4rast31unpack_text_10p_attributed_implEPKvPKhPhj
 .thumb_func
-_ZN3vga31unpack_text_10p_attributed_implEPKvPKhPhj:
+_ZN3vga4rast31unpack_text_10p_attributed_implEPKvPKhPhj:
       @ Name the inputs
       text    .req r0
       font    .req r1

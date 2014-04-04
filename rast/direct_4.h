@@ -1,14 +1,14 @@
-#ifndef VGA_RAST_DIRECT_H
-#define VGA_RAST_DIRECT_H
+#ifndef VGA_RAST_DIRECT_4_H
+#define VGA_RAST_DIRECT_4_H
 
 #include "vga/rasterizer.h"
 
 namespace vga {
 namespace rast {
 
-class Direct : public Rasterizer {
+class Direct_4 : public Rasterizer {
 public:
-  Direct(unsigned width, unsigned height, unsigned top_line = 0);
+  Direct_4(unsigned width, unsigned height, unsigned top_line = 0);
 
   virtual void activate(Timing const &);
   virtual LineShape rasterize(unsigned, Pixel *);
@@ -31,4 +31,4 @@ private:
 }  // namespace rast
 }  // namespace vga
 
-#endif  // VGA_RAST_DIRECT_H
+#endif  // VGA_RAST_DIRECT_4_H

@@ -1,4 +1,4 @@
-#include "vga/rast/direct.h"
+#include "vga/rast/direct_4.h"
 
 #include "vga/copy_words.h"
 #include "vga/vga.h"
@@ -7,13 +7,13 @@
 namespace vga {
 namespace rast {
 
-Direct::Direct(unsigned width, unsigned height, unsigned top_line)
+Direct_4::Direct_4(unsigned width, unsigned height, unsigned top_line)
   : _width(width),
     _height(height),
     _top_line(top_line) {}
 
 
-void Direct::activate(Timing const &) {
+void Direct_4::activate(Timing const &) {
   _fb[0] = new unsigned char[_width * _height];
   _fb[1] = new unsigned char[_width * _height];
   _page1 = false;
@@ -24,12 +24,12 @@ void Direct::activate(Timing const &) {
   }
 }
 
-void Direct::deactivate() {
+void Direct_4::deactivate() {
   _fb[0] = _fb[1] = nullptr;
 }
 
 __attribute__((section(".ramcode")))
-Rasterizer::LineShape Direct::rasterize(unsigned line_number, Pixel *target) {
+Rasterizer::LineShape Direct_4::rasterize(unsigned line_number, Pixel *target) {
   line_number -= _top_line;
   line_number /= 4;
   if (line_number >= _height) return { 0, 0 };
@@ -41,12 +41,12 @@ Rasterizer::LineShape Direct::rasterize(unsigned line_number, Pixel *target) {
   return { 0, _width * 4 };
 }
 
-void Direct::flip() {
+void Direct_4::flip() {
   vga::sync_to_vblank();
   _page1 = !_page1;
 }
 
-void Direct::flip_now() {
+void Direct_4::flip_now() {
   _page1 = !_page1;
 }
 

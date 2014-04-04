@@ -13,7 +13,7 @@ vga[cc_files] := \
   timing.cc \
   vga.cc \
   rast/bitmap_1.cc \
-  rast/direct.cc \
+  rast/direct_4.cc \
   rast/solid_color.cc \
   rast/text_10x16.cc
 

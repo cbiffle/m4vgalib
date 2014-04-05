@@ -26,7 +26,6 @@
 #include "vga/arena.h"
 #include "vga/copy_words.h"
 #include "vga/timing.h"
-#include "vga/measurement.h"
 #include "vga/rasterizer.h"
 
 using etl::common::Size;
@@ -148,8 +147,6 @@ void init() {
                   .with_dcen(true)
                   .with_icen(true)
                   .with_prften(true));
-
-  msigs_init();
 
   band_list_head = 0;
 
@@ -344,7 +341,6 @@ void hblank_interrupt()
 RAM_CODE
 __attribute__((noinline))
 static void start_of_active_video() {
-  vga::msig_a_toggle();
   // CC2 indicates start of active video (end of back porch).
   // This only matters in displayed states.
   if (is_displayed_state(vga::state)) {
@@ -434,7 +430,6 @@ static void start_of_active_video() {
                 // Finally, enable.
                 .with_en(true));
   }
-  vga::msig_a_toggle();
 }
 
 RAM_CODE

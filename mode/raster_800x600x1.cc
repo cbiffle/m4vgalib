@@ -1,6 +1,6 @@
 #include "vga/mode/raster_800x600x1.h"
 
-#include "lib/stm32f4xx/rcc.h"
+#include "etl/stm32f4xx/rcc.h"
 #include "vga/timing.h"
 
 namespace vga {
@@ -9,7 +9,7 @@ namespace mode {
 static constexpr unsigned cols = 800;
 static constexpr unsigned rows = 600;
 
-static stm32f4xx::ClockConfig const clock_cfg = {
+static etl::stm32f4xx::ClockConfig const clock_cfg = {
   8000000,  // external crystal Hz
   8,        // divide down to 1Mhz
   320,      // multiply up to 320MHz VCO

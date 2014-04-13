@@ -3,7 +3,7 @@
 #include "etl/common/types.h"
 #include "etl/common/size.h"
 
-#include "lib/common/attribute_macros.h"
+#include "etl/common/attribute_macros.h"
 #include "etl/armv7m/exceptions.h"
 #include "etl/armv7m/exception_table.h"
 #include "etl/armv7m/instructions.h"
@@ -52,10 +52,10 @@ using etl::stm32f4xx::syscfg;
 using etl::stm32f4xx::tim1;
 using etl::stm32f4xx::tim8;
 
-#define IN_SCAN_RAM SECTION(".vga_scan_ram")
-#define IN_LOCAL_RAM SECTION(".vga_local_ram")
+#define IN_SCAN_RAM ETL_SECTION(".vga_scan_ram")
+#define IN_LOCAL_RAM ETL_SECTION(".vga_local_ram")
 
-#define RAM_CODE SECTION(".ramcode")
+#define RAM_CODE ETL_SECTION(".ramcode")
 
 namespace vga {
 
@@ -101,13 +101,13 @@ static State volatile state;
 // This is the DMA source for scan-out, filled during pend_sv.
 // It's aligned for DMA.
 // It contains four trailing pixels that are kept black for blanking.
-ALIGNED(4) IN_SCAN_RAM
+ETL_ALIGNED(4) IN_SCAN_RAM
 static Pixel scan_buffer[max_pixels_per_line + 4];
 
 // This is the intermediate buffer used during rasterization.
 // It should be close to the CPU and need not be DMA-capable.
 // It's aligned to make copying it more efficient.
-ALIGNED(4) IN_LOCAL_RAM
+ETL_ALIGNED(4) IN_LOCAL_RAM
 static Pixel working_buffer[max_pixels_per_line];
 
 static Rasterizer::LineShape working_buffer_shape;

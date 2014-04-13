@@ -14,6 +14,7 @@ vga[cc_files] := \
   vga.cc \
   rast/bitmap_1.cc \
   rast/direct.cc \
+  rast/solid_color.cc \
   rast/text_10x16.cc
 
 vga[S_files] := \

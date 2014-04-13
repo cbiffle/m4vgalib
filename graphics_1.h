@@ -23,6 +23,8 @@ public:
   void clear_line(int x1, int y1, int x2, int y2);
   void clear_line(float x1, float y1, float x2, float y2);
 
+  void set_line_unclipped(int x1, int y1, int x2, int y2);
+
   void draw_line(int x1, int y1, int x2, int y2, bool set);
   void draw_line(float x1, float y1, float x2, float y2, bool set);
 

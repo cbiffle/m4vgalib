@@ -151,8 +151,9 @@ void select_mode(Mode *mode) {
   video_off();
 
   // Place TIM8 in reset, stopping all timing, and disable its interrupt.
-  rcc.enter_reset(ApbPeripheral::tim8);
   disable_irq(Interrupt::tim8_cc);
+  rcc.enter_reset(ApbPeripheral::tim8);
+  clear_pending_irq(Interrupt::tim8_cc);
 
   // Busy-wait for pending DMA to complete.
   while (dma2.stream1.read_cr().get_en());

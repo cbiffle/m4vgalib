@@ -1,0 +1,101 @@
+Sources of Execution Time Nondeterminism on STM32F407
+=====================================================
+
+
+Code Execution from Flash
+-------------------------
+
+There are several varieties of penalties one may incur when executing from
+Flash.
+
+When prefetching and cache are disabled, high-speed execution will hit a ~5
+cycle penalty (depending on speed) every time a 128-bit Flash line is crossed.
+(There does not appear to be a way to disable the 128-bit line latch, which
+would at least impose the same penalty on every instruction fetch.)
+
+Note that instruction prefetching won't work on A-rev devices, even if "enabled"
+by software.
+
+The CPU's maximum instruction consumption rate is 4 bytes per cycle, limited
+primarily by the width of the Icode port.  Since the Flash can sustain reads at
+(amortized) 2.6 bytes/cycle, the prefetcher cannot keep the CPU fed at its full
+rate.  This particularly comes into play when using lots of fast 32-bit
+instructions, which in turn happens most often in performance-sensitive code
+using the DSP instruction set.
+
+When the (meager) cache is enabled, cold edges will incur 5c penalty.
+
+The Flash itself has an icache of 1024 bytes (64 lines) and a dcache of 128
+bytes (8 lines).  Both caches appear to be fully associative with LRU eviction.
+There is no hardware prefetching option for literals (data in Flash).  As usual,
+data accesses have priority at the Flash multiplexer.
+
+Lines prefetched from Flash do not appear to pollute the icache until used,
+which is awesome.
+
+It's not clear from the CM4 TRM whether it makes sense to hoist loads from slow
+memory.  I suspect that the CPU will take the wait states immediately, but it
+might be smart.  This should be easy to test.
+
+Interestingly, placing an interrupt handler in Flash does *not* automatically
+introduce nondeterminism.  Exception entry takes 12 cycles on the CM4 in best
+case, during which time the first instruction is fetched in parallel with the
+register stacking.  The register stacking (on Dcode) takes long enough to mask
+the fetch wait states (on Icode).  This can actually *reduce* interrupt latency
+compared to handlers in RAM if the RAM code is in the same memory as the stack,
+generating contention.
+
+Likewise, returning from exception into Flash can mask fetch latency behind the
+8 register fetches (10 cycles overall).
+
+Placing the vector *table* in Flash does appear to produce interrupt latency
+penalties, and pollutes the already meager 128-byte data cache with vector
+fetches.
+
+ - Prefer rev-Z parts.
+ - Turn on prefetching; it has little cost and can greatly improve the
+   performance of *most* straight-line code.
+ - Turn on the icache.
+ - Align hot function or loop entry to Flash line (16 byte) boundary to ensure
+   that the second line can be prefetched and to improve cache packing.
+ - Keep hot loops in Flash under 1024 bytes.
+
+
+Accessing Registers of Fast Timers
+----------------------------------
+
+Just found this one, so I haven't fully characterized it.
+
+When APB2 runs at 1/2 HCLK, the timers on that bus (including the ones we use)
+are clocked at HCLK, not APBCLK.  (This is only mentioned in a diagram in the
+reference manual, not anywhere in the text.)
+
+When the timer's prescaler is set to 3 (divide-by-four, or half APBCLK) or
+greater, accesssing its registers is wait-stated but deterministic.  
+
+When the timer prescaler is set to less than 3, access to the registers incurs a
+one-cycle stall *sometimes.*  This happens when PSC=2, meaning the timer is
+clocked at APBCLK, so it isn't an issue with accesses beating against a div3
+update rate.
+
+
+AHB Contention
+--------------
+
+AHB slave ports appear to be shared round-robin between *waiting* masters.
+If two masters continuously access the bus at the same rate, they can be
+deterministically interleaved.  But if one is slightly irregular or at a
+different frequency, accesses will beat.
+
+It's particularly worth noting that the round-robin method here appears to
+operate in terms of accesses, not cycles -- so a master can effectively starve
+others by generating many-cycle bus accesses.  The easiest way to do this is to
+access slow memory (such as uncached Flash or nearly anything on the FSMC), but
+unaligned accesses can produce a similar effect, as can access to slow-clocked
+APB peripherals.
+
+- Consider the access patterns of the AHB masters carefully.
+- Review the bus matrix interconnection diagram in the reference manual, and
+  try to keep all potentially concurrent master accesses from overlapping.
+
+

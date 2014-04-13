@@ -1,0 +1,52 @@
+Things Affecting Interrupt Latency on Cortex-M4 (r0p1)
+======================================================
+
+
+Tail Chaining
+-------------
+
+This is a fun one.
+
+Normally, entering an exception takes 16 cycles for stacking etc.
+
+If another exception at the same priority is exiting when we go pending -- or
+a lower-priority exception happens to be exiting at just the right time -- entry
+only takes 6 cycles.  Effectively this adds *negative 10 cycles of latency.*
+
+*Workaround:* avoid these timing interactions.  Turning off tail-chaining is not
+the answer, because that will *add* latency in the same situation.  Best just to
+avoid having two interrupts so close in time.
+
+
+Uninterruptible bus transactions
+--------------------------------
+
+If code is accessing an N-wait-state memory (for N > 0) on the D-code bus,
+it will delay the start of context stacking, and thus exception entry, by up to
+the number of wait states.  I've observed a 6-cycle interrupt lag when accessing
+the STM32F407's Flash at exactly the wrong time.
+
+*Workaround:* try to avoid access to Flash (or other slow memory) around the
+time a latency-sensitive interrupt may become pending.  (One concrete idea:
+schedule a just-lower-priority interrupt for a ways before that will simply
+idle until the higher-priority interrupt fires, serving as a sort of bus
+quiesence shield.)
+
+Similarly, the processor's support for misaligned access on the D-code bus
+effectively transforms 0-wait-state memory into (up to) 2-wait-state memory.
+It's not clear whether the System bus has the same penalty, because the M4 TRM
+notes that the System bus can do its own alignment correction without processor
+involvement.
+
+*Workaround:* disable processor support for unaligned accesses.
+
+
+Uninterruptible instructions
+----------------------------
+
+An instruction like `ldm` can easily use 17 cycles when running against 0WS
+memory, and much more on slow memory.  By default, it's interruptible with
+continue.  It's possible to disable this, which will add the entire runtime of
+the instruction to the interrupt latency.
+
+*Workaround:* don't do this.

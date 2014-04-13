@@ -1,0 +1,126 @@
+Fast, Low-Jitter Parallel Output on STM32F4
+===========================================
+
+My requirements:
+
+ - To get full color without a hardware palette, I need at least 8 bits of
+   parallel output.
+
+ - To get stable high-resolution video, the output needs to be able to sustain
+   its full output speed for a scanline -- which let's call up to 800 pixels.
+
+ - To look nice on an LCD or Trinitron, which enforce a pixel grid, I should
+   stick to published pixel clocks, dividing them by an integer if required.
+
+
+Approach #1: timer-mediated DMA
+-------------------------------
+
+First, I tried controlling the DMA transfer from TIM8's update output.  The
+goal was to have TIM8 trigger a pixel at every cycle, by repeatedly overflowing
+it if required.
+
+I could generate a DMA request every two timer cycles by loading ARR=1.  This
+was my first encounter with the reference manual's ambiguity on TIM8's clock
+source; I noticed that PSC values above 4 seemed to produce different behavior.
+
+Anyway.  With this approach I was able to produce pixels at 20MHz (from a 160MHz
+core clock), which was disappointing -- not enough for a standard 640x480 mode.
+This amounted to HCLK/8.  In hindsight, I'll bet I can derive the /8 number
+rigorously: TIM8's ARR is providing a /2, leaving a /4 to track down, and (as
+we'll see in a minute) that's the highest throughput I've gotten.
+
+    Aside: the way the timers interact with DMA on this part is odd.  A timer
+    can influence a DMA transfer by generating an output-compare match, a
+    trigger output (which is a small superset of output-compares), an update
+    (counter crossing zero, etc.), or a commutation event.  We don't appear
+    to be able to generate a DRQ at every count event.
+
+
+Approach #2: bit-banging
+------------------------
+
+I was concerned that I'd hit a fundamental speed limit in the DMA controller or
+GPIO peripheral, so I designed an experiment to distinguish.  I made 640 copies
+of this sequence:
+
+    ldrb r2, [r0], #1
+    strb r2, [r1]
+
+...where:
+ - r0 is the address of a buffer in SRAM.
+ - r1 is the address of the GPIO ODR register.
+ - r2 is a temporary.
+
+From the Cortex-M4 TRM it looked like this would take four cycles per pixel,
+deterministically.  In practice I got jitter, leading to my first pass at
+relocating code into SRAM.  Running it from SRAM eliminated the jitter.  (It's
+worth noting this was on an A-rev STM32F407, with the Flash prefetch bug.
+The jitter might not appear on a modern part.  The two-bytes-per-cycle icode
+rate is well below the Flash's theoretical output.)
+
+After some Googling, I found a guy in Turkey (or at least a guy who writes a
+lot of Turkish in his code) who used a similar approach successfully.  So it
+*would* work!
+
+But it would also burn most of my CPU cycles.  To avoid jitter, this code had
+to run with interrupts masked.  At 640x480@60, that's 80% of my CPU; at 800x600
+(which I was still shooting for), just under 76%.  Poo.
+
+Now that I was confident the GPIO could sustain output at HCLK/4, it was time
+to revisit the DMA controller.
+
+
+Approach #3: exploring the limits of the DMA controller
+-------------------------------------------------------
+
+Revisiting my code from approach #1, I started fiddling with all the knobs.
+
+The first thing I noticed was that, by enabling the FIFO and reading memory
+in 16-bit units, I could slightly increase the throughput to HCLK/5.  (My notes
+don't contain jitter measurements for this, but I suspect it was unstable.)
+
+Interestingly, reading in 32-bit units had no additional throughput effect, nor
+did adjusting the FIFO trigger/fill points.
+
+I briefly played with 16-bit output at this time, and couldn't quite make it
+work -- probably due to extreme tiredness.
+
+"Screw it," I said, "let's just benchmark this DMA controller."  I literally
+pulled out all the stops -- I turned off TIM8's mediation of the transfer and
+configured the hardware for pure memory-to-memory mode, which the docs suggested
+would go as fast as possible.
+
+With this change, I finally achieved HCLK/4 stable output.  It appeared to be
+a fundamental limit of the DMA controller; increasing the width of source reads
+to 32 bits didn't cause the output to become either faster or clumpier.
+
+There was one drawback, however: I couldn't slow it down!  The approach could
+produce pixels at exactly 1/4 of the AHB clock rate, which -- given my desire to
+conform to standard video modes -- gave me an upper limit on system performance
+for each mode.
+
+The worst offender is the old 25.175MHz 640x480 mode.  To generate this mode,
+I have to underclock the CPU to 100.7MHz.  Moreover, because this mode spends
+relatively little time in blank (compared to, say, SVGA modes), it imposes a
+double penalty:
+
+ - 640x480 60Hz has 4480us of blank time per frame, or 451.2 kilocycles.
+ - 800x600 60Hz has 4579us of blank time per frame, which at its higher
+   HCLK frequency gives 732.7 kilocycles -- 60% more compute throughput.
+
+
+Approach #4: static RAM controller
+----------------------------------
+
+I experimented with using the FSMC peripheral to generate parallel output
+instead.  The advantage is that the FSMC is on its own AHB slave port on the
+matrix, so the DMA transfer during scanout won't occupy the port connected to
+AHB1 (and by extension all the peripherals).
+
+This didn't last long.  While I can get excellent throughput -- faster than
+HCLK/4 -- it's batchy.  The memory controller seems to take 1 AHB cycle between
+transfers to...I dunno, breathe or something.  With AHB burst modes and
+wide transfers I could reduce this to one cycle of idle time every 16 pixels,
+but this will still introduce unacceptable phase shifts over the course of an
+800-pixel visible area.

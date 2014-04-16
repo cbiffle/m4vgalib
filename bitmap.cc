@@ -1,8 +1,8 @@
 #include "vga/bitmap.h"
 
-#include "etl/common/algorithm.h"
+#include "etl/algorithm.h"
 
-using etl::common::min;
+using etl::min;
 
 #define INVARIANT(c) while (!(c)) {}
 #define PRE(c) while (!(c)) {}

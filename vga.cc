@@ -1,9 +1,9 @@
 #include "vga/vga.h"
 
-#include "etl/common/types.h"
-#include "etl/common/size.h"
+#include "etl/types.h"
+#include "etl/size.h"
 
-#include "etl/common/attribute_macros.h"
+#include "etl/attribute_macros.h"
 #include "etl/armv7m/exceptions.h"
 #include "etl/armv7m/exception_table.h"
 #include "etl/armv7m/instructions.h"
@@ -28,8 +28,8 @@
 #include "vga/timing.h"
 #include "vga/rasterizer.h"
 
-using etl::common::Size;
-using etl::common::UInt8;
+using etl::Size;
+using etl::UInt8;
 
 using etl::armv7m::Scb;
 using etl::armv7m::scb;

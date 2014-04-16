@@ -1,10 +1,10 @@
 #include "vga/arena.h"
 
-#include "etl/common/types.h"
+#include "etl/types.h"
 
-using etl::common::UInt8;
-using etl::common::UIntPtr;
-using etl::common::Size;
+using etl::UInt8;
+using etl::UIntPtr;
+using etl::Size;
 
 namespace vga {
 

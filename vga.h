@@ -1,11 +1,11 @@
 #ifndef VGA_VGA_H
 #define VGA_VGA_H
 
-#include "etl/common/types.h"
+#include "etl/types.h"
 
 namespace vga {
 
-typedef etl::common::UInt8 Pixel;
+typedef etl::UInt8 Pixel;
 
 struct Timing;
 class Rasterizer;

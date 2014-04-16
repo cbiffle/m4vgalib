@@ -1,7 +1,7 @@
 #ifndef VGA_MEASUREMENT_H
 #define VGA_MEASUREMENT_H
 
-#include "etl/common/attribute_macros.h"
+#include "etl/attribute_macros.h"
 #include "etl/armv7m/sys_tick.h"
 #include "etl/stm32f4xx/gpio.h"
 

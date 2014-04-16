@@ -1,7 +1,7 @@
 #ifndef VGA_ARENA_H
 #define VGA_ARENA_H
 
-#include "etl/common/size.h"
+#include "etl/size.h"
 
 namespace vga {
 
@@ -11,16 +11,16 @@ namespace vga {
  */
 void arena_reset();
 
-etl::common::Size arena_bytes_free();
-etl::common::Size arena_bytes_total();
+etl::Size arena_bytes_free();
+etl::Size arena_bytes_total();
 
 }  // namespace vga
 
 /*
  * Allocates a word-aligned chunk of memory from the arena.
  */
-void *operator new(etl::common::Size);
-void *operator new[](etl::common::Size);
+void *operator new(etl::Size);
+void *operator new[](etl::Size);
 
 /*
  * Does nothing.  The arena is deleted en-masse.

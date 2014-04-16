@@ -5,7 +5,7 @@
 #include "vga/rast/unpack_1bpp.h"
 
 using etl::armv7m::Word;
-using etl::common::UInt32;
+using etl::UInt32;
 
 namespace vga {
 namespace rast {

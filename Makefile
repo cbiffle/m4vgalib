@@ -20,7 +20,6 @@ vga[cc_files] := \
 
 vga[S_files] := \
   copy_words.S \
-  graphics_1_assist.S \
   rast/unpack_1bpp.S \
   rast/unpack_direct_x2.S \
   rast/unpack_direct_x4.S \

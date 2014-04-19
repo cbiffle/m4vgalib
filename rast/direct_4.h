@@ -6,6 +6,11 @@
 namespace vga {
 namespace rast {
 
+/*
+ * A direct-color rasterizer that multiplies pixels by 4 on both axes, for
+ * an overall 16x multiplication factor.  For example, this turns an 800x600
+ * output timing mode into a 200x150 chunky graphics mode.
+ */
 class Direct_4 : public Rasterizer {
 public:
   Direct_4(unsigned width, unsigned height, unsigned top_line = 0);

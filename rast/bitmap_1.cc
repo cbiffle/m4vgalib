@@ -43,7 +43,7 @@ Bitmap Bitmap_1::get_bg_bitmap() const {
   return { _fb[!_page1],
            _words_per_line * 32,
            _lines,
-           _words_per_line };
+           static_cast<int>(_words_per_line) };
 }
 
 Graphics1 Bitmap_1::make_bg_graphics() const {

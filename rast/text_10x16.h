@@ -21,12 +21,15 @@ public:
                 char c);
   void put_packed(unsigned col, unsigned row, unsigned p);
 
+  void set_x_adj(int v) { _x_adj = v; }
+
 private:
   unsigned _cols;
   unsigned _rows;
   unsigned *_fb;
   unsigned char *_font;
   unsigned _top_line;
+  int _x_adj;
 };
 
 }  // namespace rast

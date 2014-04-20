@@ -15,7 +15,8 @@ Text_10x16::Text_10x16(unsigned width, unsigned height, unsigned top_line)
     _rows((height + (glyph_rows - 1)) / glyph_rows),
     _fb(nullptr),
     _font(nullptr),
-    _top_line(top_line) {}
+    _top_line(top_line),
+    _x_adj(0) {}
 
 void Text_10x16::activate(Timing const &timing) {
   _font = new unsigned char[chars_in_font * glyph_rows];
@@ -39,7 +40,7 @@ Rasterizer::LineShape Text_10x16::rasterize(unsigned line_number,
   unsigned const *src = _fb + _cols * text_row;
   unsigned char const *font = _font + row_in_glyph * chars_in_font;
 
-  unpack_text_10p_attributed_impl(src, font, raster_target, _cols);
+  unpack_text_10p_attributed_impl(src, font, raster_target + _x_adj, _cols);
 
   return { 0, _cols * glyph_cols };
 }

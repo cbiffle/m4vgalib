@@ -21,6 +21,18 @@ ETL_INLINE void msig_a_toggle() {
   etl::stm32f4xx::gpioc.toggle(etl::stm32f4xx::Gpio::p9);
 }
 
+ETL_INLINE void msig_b_set() {
+  etl::stm32f4xx::gpioc.set(etl::stm32f4xx::Gpio::p8);
+}
+
+ETL_INLINE void msig_b_clear() {
+  etl::stm32f4xx::gpioc.clear(etl::stm32f4xx::Gpio::p8);
+}
+
+ETL_INLINE void msig_b_toggle() {
+  etl::stm32f4xx::gpioc.toggle(etl::stm32f4xx::Gpio::p8);
+}
+
 void mtim_init();
 
 ETL_INLINE unsigned mtim_get() {

@@ -329,10 +329,10 @@ void sync_to_vblank() {
 void default_hblank_interrupt();  // decl hack
 RAM_CODE void default_hblank_interrupt() {}
 
-void hblank_interrupt()
-  __attribute__((weak, alias("_ZN3vga24default_hblank_interruptEv")));
-
 }  // namespace vga
+
+void vga_hblank_interrupt()
+  __attribute__((weak, alias("_ZN3vga24default_hblank_interruptEv")));
 
 /*******************************************************************************
  * Horizontal timing interrupt.
@@ -516,7 +516,7 @@ static vga::Rasterizer *get_next_rasterizer() {
 
 RAM_CODE
 void etl_armv7m_pend_sv_handler() {
-  vga::hblank_interrupt();
+  vga_hblank_interrupt();
 
   if (is_rendered_state(vga::state)) {
     vga::Timing const &timing = vga::current_timing;

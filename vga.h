@@ -34,11 +34,13 @@ bool in_vblank();
 
 void sync_to_vblank();
 
+unsigned get_cpu_usage();
+
+}  // namespace vga
+
 /*
  * Applications can implement this function to receive a callback during hblank.
  */
-extern void hblank_interrupt();
-
-}  // namespace vga
+extern void vga_hblank_interrupt();
 
 #endif  // VGA_VGA_H

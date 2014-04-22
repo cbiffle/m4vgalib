@@ -1,6 +1,6 @@
 .syntax unified
 
-#ifdef ARM_CORTEX_M4
+#ifdef __ARM_PCS_VFP
 
 @ High-throughput block transfer using the FPU register set as a 128-byte
 @ buffer.

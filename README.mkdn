@@ -1,0 +1,36 @@
+This library provides high-quality, high-resolution color graphics output from
+STM32F40x/1x microcontrollers, using very few external components.
+
+This repository contains only the reusable library bits.  To try it out, or just
+see an example of how it's used, see the [m4vgalib-demos] repository.
+
+
+Brief Overview
+==============
+
+The STM32F407 is a Cortex-M4 microcontroller that has neither a video
+controller, nor enough RAM for a framebuffer at any reasonable resolution.
+
+m4vgalib works around this to produce stable 800x600 (or 640x480) video with
+256 colors.  Instead of a video controller, m4vgalib uses two timers, one
+DMA controller, and a GPIO port.  Instead of a framebuffer, m4vgalib uses a
+modular rasterization system that lets applications "race the beam" -- prepare
+video output on the fly from some compact representation.
+
+Out of the box, m4vgalib includes canned rasterizers for both palettized pixel
+graphics and attributed text graphics, with various formats and depths.
+Applications can change rasterizers at any scanline to achieve split-screen or
+raster effects.
+
+Even though m4vgalib is maintaining a 320Mb/s data stream on a processor not
+designed for anything of the sort, most of the CPU and hardware resources are
+left available to applications.  To avoid introducing jitter, applications must
+only agree to keep their filthy hands off AHB1 during certain phases of
+execution.  (Interrupts are available to notify the application of this.)
+
+The application runs as a "thread" parallel to m4vgalib, and it's even possible
+to run an application using an RTOS with a bit of porting effort.  (Hint: the
+RTOS must coordinate with m4vgalib on the use of the PendSV handler.)
+
+
+[m4vgalib-demos]: https://github.com/cbiffle/m4vgalib-demos

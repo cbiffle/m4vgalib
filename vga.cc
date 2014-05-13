@@ -148,7 +148,7 @@ void init() {
                   .with_icen(true)
                   .with_prften(true));
 
-  band_list_head = 0;
+  band_list_head = nullptr;
 
   sync_off();
   video_off();

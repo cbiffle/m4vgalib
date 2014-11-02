@@ -1,5 +1,6 @@
 #include "vga/rast/text_10x16.h"
 
+#include "vga/arena.h"
 #include "vga/timing.h"
 #include "vga/font_10x16.h"
 #include "vga/rast/unpack_text_10p_attributed.h"
@@ -19,8 +20,8 @@ Text_10x16::Text_10x16(unsigned width, unsigned height, unsigned top_line)
     _x_adj(0) {}
 
 void Text_10x16::activate(Timing const &timing) {
-  _font = new unsigned char[chars_in_font * glyph_rows];
-  _fb = new unsigned[_cols * _rows];
+  _font = arena_new_array<unsigned char>(chars_in_font * glyph_rows);
+  _fb = arena_new_array<unsigned>(_cols * _rows);
 
   for (unsigned i = 0; i < chars_in_font * glyph_rows; ++i) {
     _font[i] = font_10x16[i];

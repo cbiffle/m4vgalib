@@ -1,5 +1,6 @@
 #include "vga/rast/direct_2.h"
 
+#include "vga/arena.h"
 #include "vga/copy_words.h"
 #include "vga/vga.h"
 #include "vga/rast/unpack_direct_x2.h"
@@ -12,10 +13,9 @@ Direct_2::Direct_2(unsigned width, unsigned height, unsigned top_line)
     _height(height),
     _top_line(top_line) {}
 
-
 void Direct_2::activate(Timing const &) {
-  _fb[0] = new unsigned char[_width * _height];
-  _fb[1] = new unsigned char[_width * _height];
+  _fb[0] = arena_new_array<unsigned char>(_width * _height);
+  _fb[1] = arena_new_array<unsigned char>(_width * _height);
   _page1 = false;
 
   for (unsigned i = 0; i < _width * _height; ++i) {

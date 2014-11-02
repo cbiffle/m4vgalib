@@ -1,5 +1,6 @@
 #include "vga/rast/direct_4.h"
 
+#include "vga/arena.h"
 #include "vga/copy_words.h"
 #include "vga/vga.h"
 #include "vga/rast/unpack_direct_x4.h"
@@ -14,8 +15,8 @@ Direct_4::Direct_4(unsigned width, unsigned height, unsigned top_line)
 
 
 void Direct_4::activate(Timing const &) {
-  _fb[0] = new unsigned char[_width * _height];
-  _fb[1] = new unsigned char[_width * _height];
+  _fb[0] = arena_new_array<unsigned char>(_width * _height);
+  _fb[1] = arena_new_array<unsigned char>(_width * _height);
   _page1 = false;
 
   for (unsigned i = 0; i < _width * _height; ++i) {

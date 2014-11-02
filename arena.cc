@@ -79,11 +79,7 @@ size_t arena_bytes_total() {
   return arena_total_bytes;
 }
 
-}  // namespace vga
-
-// TODO(cbiffle): this should really use nothrow new, or better yet, not
-// implement operator new at all.
-void *operator new(size_t bytes) {
+void * arena_alloc(size_t bytes) {
   // We allocate in words, not bytes, so round up if required.
   bytes = (bytes + 3) & ~3;
 
@@ -98,9 +94,4 @@ void *operator new(size_t bytes) {
   while (1);
 }
 
-void *operator new[](size_t bytes) {
-  return ::operator new(bytes);
-}
-
-void operator delete(void *) {
-}
+}  // namespace vga

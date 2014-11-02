@@ -61,7 +61,8 @@ public:
    */
   virtual void deactivate();
 
-  virtual ~Rasterizer();
+protected:
+  ~Rasterizer() = default;
 };
 
 }  // namespace vga

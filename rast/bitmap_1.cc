@@ -2,6 +2,7 @@
 
 #include <cstdint>
 
+#include "vga/arena.h"
 #include "vga/copy_words.h"
 #include "vga/vga.h"
 #include "vga/rast/unpack_1bpp.h"
@@ -17,8 +18,8 @@ Bitmap_1::Bitmap_1(unsigned width, unsigned height, unsigned top_line)
     _top_line(top_line) {}
 
 void Bitmap_1::activate(Timing const &) {
-  _fb[0] = new uint32_t[_words_per_line * _lines];
-  _fb[1] = new uint32_t[_words_per_line * _lines];
+  _fb[0] = arena_new_array<uint32_t>(_words_per_line * _lines);
+  _fb[1] = arena_new_array<uint32_t>(_words_per_line * _lines);
   _page1 = false;
   _clut[0] = 0;
   _clut[1] = 0xFF;

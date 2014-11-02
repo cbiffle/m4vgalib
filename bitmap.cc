@@ -1,5 +1,7 @@
 #include "vga/bitmap.h"
 
+#include <cstdint>
+
 #include "etl/algorithm.h"
 
 using etl::min;
@@ -9,16 +11,16 @@ using etl::min;
 
 namespace vga {
 
-static constexpr unsigned maskbits(unsigned n) {
-  return (1 << n) - 1;
+static constexpr uint32_t maskbits(unsigned n) {
+  return (uint32_t(1) << n) - 1;
 }
 
 /*
  * Specialization of bitrow for when both source and dest are word-aligned.
  * This reduces to N word transfers and a final bitfield insert.
  */
-static void bitrow_aligned(unsigned const *source,
-                           unsigned *dest,
+static void bitrow_aligned(uint32_t const *source,
+                           uint32_t *dest,
                            unsigned bit_count) {
   // TODO: should totally use copy_words here.
   while (bit_count >= 32) {
@@ -27,7 +29,7 @@ static void bitrow_aligned(unsigned const *source,
   }
 
   if (bit_count) {
-    unsigned mask = (1 << bit_count) - 1;
+    uint32_t mask = (1 << bit_count) - 1;
     *dest = (*dest & ~mask) | (*source & mask);
   }
 }
@@ -35,13 +37,13 @@ static void bitrow_aligned(unsigned const *source,
 /*
  * Specialization of bitrow for when source and dest are unaligned the same way.
  */
-static void bitrow_almost_aligned(unsigned const *source,
-                                  unsigned *dest,
+static void bitrow_almost_aligned(uint32_t const *source,
+                                  uint32_t *dest,
                                   unsigned start_bit,
                                   unsigned bit_count) {
   PRE(start_bit < 32);
   unsigned bits = min(32u - start_bit, bit_count);
-  unsigned mask = maskbits(bits) << start_bit;
+  uint32_t mask = maskbits(bits) << start_bit;
   *dest = (*dest & ~mask) | (*source & mask);
   
   bitrow_aligned(source + 1, dest + 1, bit_count - bits);
@@ -51,9 +53,9 @@ static void bitrow_almost_aligned(unsigned const *source,
  * Specialization of bitrow for when only dest is aligned.
  */
 __attribute__((noinline))
-static void bitrow_dest_aligned(unsigned const *source,
+static void bitrow_dest_aligned(uint32_t const *source,
                                 unsigned source_offset,
-                                unsigned *dest,
+                                uint32_t *dest,
                                 unsigned bit_count) {
   PRE(source_offset < 32);
 
@@ -65,7 +67,7 @@ static void bitrow_dest_aligned(unsigned const *source,
   }
 
   if (bit_count) {
-    unsigned s = source[0] >> source_offset;
+    uint32_t s = source[0] >> source_offset;
     if (bit_count > 32 - source_offset) {
       s |= source[1] << (32 - source_offset);
     }
@@ -76,14 +78,14 @@ static void bitrow_dest_aligned(unsigned const *source,
 /*
  * Specialization of bitrow for when only source is aligned.
  */
-static void bitrow_source_aligned(unsigned const *source,
-                                  unsigned *dest,
+static void bitrow_source_aligned(uint32_t const *source,
+                                  uint32_t *dest,
                                   unsigned dest_offset,
                                   unsigned bit_count) {
   PRE(dest_offset < 32);
 
   while (bit_count >= 32) {
-    unsigned s = *source++;
+    uint32_t s = *source++;
     *dest = (*dest & maskbits(dest_offset)) | (s << dest_offset);
     dest++;
     *dest = (*dest & ~maskbits(dest_offset)) | (s >> (32 - dest_offset));
@@ -91,7 +93,7 @@ static void bitrow_source_aligned(unsigned const *source,
   }
 
   if (bit_count) {
-    unsigned s = *source & maskbits(bit_count);
+    uint32_t s = *source & maskbits(bit_count);
     dest[0] = (dest[0] & maskbits(dest_offset)) | (s << dest_offset);
     if (bit_count > (32 - dest_offset)) {
       dest[1] = (dest[1] & ~maskbits(dest_offset)) | (s >> (32 - dest_offset));
@@ -100,9 +102,9 @@ static void bitrow_source_aligned(unsigned const *source,
 }
 
 __attribute__((noinline))
-static void bitrow(unsigned const *source,
+static void bitrow(uint32_t const *source,
                    unsigned source_offset,
-                   unsigned *dest,
+                   uint32_t *dest,
                    unsigned dest_offset,
                    unsigned bit_count) {
   if (source_offset == 0 && dest_offset == 0) {
@@ -151,13 +153,13 @@ void bitblt(Bitmap const &source, unsigned source_x, unsigned source_y,
   // TODO: allow for negative stride.
   // TODO: enable overlap -- for now we reject it.
   {
-    unsigned *source_start = source.word_addr(source_x, source_y);
-    unsigned *source_end   = source.word_addr(source_x + dest_blk.width,
-                                              source_y + dest_blk.height);
+    auto source_start = source.word_addr(source_x, source_y);
+    auto source_end   = source.word_addr(source_x + dest_blk.width,
+                                         source_y + dest_blk.height);
 
-    unsigned *dest_start = dest.word_addr(dest_blk.x, dest_blk.y);
-    unsigned *dest_end   = dest.word_addr(dest_blk.x + dest_blk.width,
-                                          dest_blk.y + dest_blk.height);
+    auto dest_start = dest.word_addr(dest_blk.x, dest_blk.y);
+    auto dest_end   = dest.word_addr(dest_blk.x + dest_blk.width,
+                                     dest_blk.y + dest_blk.height);
     
     PRE(dest_end < source_start || source_end < dest_start);
   }

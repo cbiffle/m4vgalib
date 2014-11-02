@@ -1,10 +1,11 @@
 #include "vga/arena.h"
 
-#include "etl/types.h"
+#include <cstdint>
+#include <cstddef>
 
-using etl::UInt8;
-using etl::UIntPtr;
-using etl::Size;
+using std::uint8_t;
+using std::uintptr_t;
+using std::size_t;
 
 namespace vga {
 
@@ -12,21 +13,21 @@ struct Region {
   void *start;
   void *end;
 
-  UIntPtr start_bits() const {
-    return reinterpret_cast<UIntPtr>(start);
+  uintptr_t start_bits() const {
+    return reinterpret_cast<uintptr_t>(start);
   }
 
-  UIntPtr end_bits() const {
-    return reinterpret_cast<UIntPtr>(end);
+  uintptr_t end_bits() const {
+    return reinterpret_cast<uintptr_t>(end);
   }
 
-  Size size_in_bytes() const {
-    return static_cast<Size>(end_bits() - start_bits());
+  size_t size_in_bytes() const {
+    return static_cast<size_t>(end_bits() - start_bits());
   }
 
-  void *take_bytes(Size n) {
+  void *take_bytes(size_t n) {
     void *old_start = start;
-    start = static_cast<UInt8 *>(old_start) + n;
+    start = static_cast<uint8_t *>(old_start) + n;
     return old_start;
   }
 };
@@ -42,7 +43,7 @@ static void fail_if(bool condition) {
 static unsigned region_count;
 static Region *state;
 
-Size arena_total_bytes;
+size_t arena_total_bytes;
 
 void arena_reset() {
   // Inspect the ROM table to figure out our RAM layout.
@@ -66,21 +67,23 @@ void arena_reset() {
   state[0].start = static_cast<Region *>(state[0].start) + region_count;
 }
 
-Size arena_bytes_free() {
-  Size free = 0;
+size_t arena_bytes_free() {
+  size_t free = 0;
   for (unsigned i = 0; i < region_count; ++i) {
     free += state[i].size_in_bytes();
   }
   return free;
 }
 
-Size arena_bytes_total() {
+size_t arena_bytes_total() {
   return arena_total_bytes;
 }
 
 }  // namespace vga
 
-void *operator new(Size bytes) {
+// TODO(cbiffle): this should really use nothrow new, or better yet, not
+// implement operator new at all.
+void *operator new(size_t bytes) {
   // We allocate in words, not bytes, so round up if required.
   bytes = (bytes + 3) & ~3;
 
@@ -95,7 +98,7 @@ void *operator new(Size bytes) {
   while (1);
 }
 
-void *operator new[](Size bytes) {
+void *operator new[](size_t bytes) {
   return ::operator new(bytes);
 }
 

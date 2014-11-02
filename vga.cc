@@ -1,7 +1,7 @@
 #include "vga/vga.h"
 
-#include "etl/types.h"
-#include "etl/size.h"
+#include <cstdint>
+#include <cstddef>
 
 #include "etl/attribute_macros.h"
 #include "etl/armv7m/exceptions.h"
@@ -28,8 +28,7 @@
 #include "vga/timing.h"
 #include "vga/rasterizer.h"
 
-using etl::Size;
-using etl::UInt8;
+using std::size_t;
 
 using etl::armv7m::Scb;
 using etl::armv7m::scb;
@@ -281,7 +280,7 @@ void configure_timing(Timing const &timing) {
   }
 
   // Scribble over working buffer to help catch bugs.
-  for (Size i = 0; i < sizeof(working_buffer); i += 2) {
+  for (size_t i = 0; i < sizeof(working_buffer); i += 2) {
     working_buffer[i] = 0xFF;
     working_buffer[i + 1] = 0x00;
   }

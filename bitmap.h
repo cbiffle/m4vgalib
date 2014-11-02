@@ -12,7 +12,7 @@ struct Bitmap {
   int stride_words;
 
   etl::armv7m::Word *word_addr(unsigned x, unsigned y) const {
-    unsigned *b = static_cast<etl::armv7m::Word *>(base);
+    auto b = static_cast<etl::armv7m::Word *>(base);
     return &b[y * stride_words + x/32];
   }
 

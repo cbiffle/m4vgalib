@@ -1,7 +1,7 @@
 #ifndef VGA_RAST_BITMAP_1_H
 #define VGA_RAST_BITMAP_1_H
 
-#include "etl/types.h"
+#include <cstdint>
 
 #include "vga/bitmap.h"
 #include "vga/rasterizer.h"
@@ -26,15 +26,15 @@ public:
   void set_fg_color(Pixel);
   void set_bg_color(Pixel);
 
-  etl::UInt32 *get_fg_buffer() const { return _fb[_page1]; }
-  etl::UInt32 *get_bg_buffer() const { return _fb[!_page1]; }
+  std::uint32_t *get_fg_buffer() const { return _fb[_page1]; }
+  std::uint32_t *get_bg_buffer() const { return _fb[!_page1]; }
 
   bool can_fg_use_bitband() const;
   bool can_bg_use_bitband() const;
   void copy_bg_to_fg() const;
 
 private:
-  etl::UInt32 *_fb[2];
+  std::uint32_t *_fb[2];
   unsigned _lines;
   unsigned _words_per_line;
   unsigned _top_line;

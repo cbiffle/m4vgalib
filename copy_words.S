@@ -15,9 +15,9 @@
 @  r2  number of words to transfer.
 .section .ramcode,"ax",%progbits
 .balign 4
-.global _Z10copy_wordsPKjPjj
+.global _Z10copy_wordsPKmPmm
 .thumb_func
-_Z10copy_wordsPKjPjj:
+_Z10copy_wordsPKmPmm:
       @ Name our registers.
       src   .req r0
       dst   .req r1

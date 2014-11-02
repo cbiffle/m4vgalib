@@ -1,11 +1,12 @@
 #include "vga/rast/bitmap_1.h"
 
+#include <cstdint>
+
 #include "vga/copy_words.h"
 #include "vga/vga.h"
 #include "vga/rast/unpack_1bpp.h"
 
-using etl::armv7m::Word;
-using etl::UInt32;
+using std::uint32_t;
 
 namespace vga {
 namespace rast {
@@ -16,8 +17,8 @@ Bitmap_1::Bitmap_1(unsigned width, unsigned height, unsigned top_line)
     _top_line(top_line) {}
 
 void Bitmap_1::activate(Timing const &) {
-  _fb[0] = new UInt32[_words_per_line * _lines];
-  _fb[1] = new UInt32[_words_per_line * _lines];
+  _fb[0] = new uint32_t[_words_per_line * _lines];
+  _fb[1] = new uint32_t[_words_per_line * _lines];
   _page1 = false;
   _clut[0] = 0;
   _clut[1] = 0xFF;
@@ -32,7 +33,7 @@ Rasterizer::LineShape Bitmap_1::rasterize(unsigned line_number, Pixel *target) {
   line_number -= _top_line;
   if (line_number >= _lines) return { 0, 0 };
 
-  UInt32 const *src = _fb[_page1] + _words_per_line * line_number;
+  uint32_t const *src = _fb[_page1] + _words_per_line * line_number;
 
   unpack_1bpp_impl(src, _clut, target, _words_per_line);
 

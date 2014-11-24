@@ -2,6 +2,8 @@
 
 #include <cstdint>
 
+#include "etl/assert.h"
+
 #include "vga/arena.h"
 #include "vga/copy_words.h"
 #include "vga/vga.h"
@@ -49,7 +51,7 @@ Bitmap Bitmap_1::get_bg_bitmap() const {
 }
 
 Graphics1 Bitmap_1::make_bg_graphics() const {
-  if (!can_bg_use_bitband()) while (1);
+  ETL_ASSERT(can_bg_use_bitband());
 
   return Graphics1(get_bg_bitmap());
 }

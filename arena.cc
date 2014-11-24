@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <cstddef>
 
+#include "etl/assert.h"
+
 using std::uint8_t;
 using std::uintptr_t;
 using std::size_t;
@@ -36,10 +38,6 @@ extern "C" {
   extern Region const _arena_regions_start, _arena_regions_end;
 }
 
-static void fail_if(bool condition) {
-  while (condition);
-}
-
 static unsigned region_count;
 static Region *state;
 
@@ -51,10 +49,10 @@ void arena_reset() {
 
   // We're going to steal some memory from the first region for our bookkeeping.
   // Make sure that'll work...
-  fail_if(region_count < 1);
+  ETL_ASSERT(region_count >= 1);
 
   Region const *reg = &_arena_regions_start;
-  fail_if(reg[0].size_in_bytes() < sizeof(Region) * region_count);
+  ETL_ASSERT(reg[0].size_in_bytes() >= sizeof(Region) * region_count);
 
   // Great.  Copy the ROM table into RAM.
   state = static_cast<Region *>(reg[0].start);
@@ -91,7 +89,7 @@ void * arena_alloc(size_t bytes) {
   }
 
   // Allocation failed!
-  while (1);
+  ETL_ASSERT(false);
 }
 
 }  // namespace vga

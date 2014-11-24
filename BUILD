@@ -26,6 +26,7 @@ c_library('vga',
   },
   deps = [
     '//etl:etl',
+    '//etl:assert_loop',
     '//etl/stm32f4xx:stm32f4xx',
   ],
 )

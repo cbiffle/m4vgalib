@@ -25,8 +25,9 @@ c_library('vga',
     'cxx_flags': [ '-O2' ],
   },
   deps = [
-    '//etl:etl',
+    '//etl',
     '//etl:assert_loop',
+    '//etl/mem',
     '//etl/stm32f4xx:stm32f4xx',
   ],
 )

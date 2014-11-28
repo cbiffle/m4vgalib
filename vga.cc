@@ -100,13 +100,13 @@ static State volatile state;
 // This is the DMA source for scan-out, filled during pend_sv.
 // It's aligned for DMA.
 // It contains four trailing pixels that are kept black for blanking.
-ETL_ALIGNED(4) IN_SCAN_RAM
+alignas(4) IN_SCAN_RAM
 static Pixel scan_buffer[max_pixels_per_line + 4];
 
 // This is the intermediate buffer used during rasterization.
 // It should be close to the CPU and need not be DMA-capable.
 // It's aligned to make copying it more efficient.
-ETL_ALIGNED(4) IN_LOCAL_RAM
+alignas(4) IN_LOCAL_RAM
 static Pixel working_buffer[max_pixels_per_line];
 
 static Rasterizer::LineShape working_buffer_shape;

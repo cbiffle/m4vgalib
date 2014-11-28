@@ -2,7 +2,7 @@
 
 namespace vga {
 
-__attribute__((aligned(4)))
+alignas(4)
 unsigned char const font_10x16[] = {
 0x0,
 0x0,

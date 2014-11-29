@@ -20,9 +20,7 @@ extern "C" {
   extern Region const _arena_regions_start, _arena_regions_end;
 }
 
-// TODO(cbiffle): a begin/end constructor would be handy on RangePtr...
-static Arena arena({&_arena_regions_start,
-                    size_t(&_arena_regions_end - &_arena_regions_start)});
+static Arena<> arena({&_arena_regions_start, &_arena_regions_end});
 
 void arena_reset() {
   arena.reset();

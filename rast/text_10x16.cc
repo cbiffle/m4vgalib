@@ -30,9 +30,6 @@ Text_10x16::~Text_10x16() {
   _cols = 0;
 }
 
-void Text_10x16::activate(Timing const &) {
-}
-
 __attribute__((section(".ramcode")))
 Rasterizer::LineShape Text_10x16::rasterize(unsigned line_number,
                                             Pixel *raster_target) {
@@ -49,9 +46,6 @@ Rasterizer::LineShape Text_10x16::rasterize(unsigned line_number,
   unpack_text_10p_attributed_impl(src, font, raster_target + _x_adj, _cols);
 
   return { 0, _cols * glyph_cols };
-}
-
-void Text_10x16::deactivate() {
 }
 
 void Text_10x16::clear_framebuffer(Pixel bg) {

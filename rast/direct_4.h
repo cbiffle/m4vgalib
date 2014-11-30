@@ -16,9 +16,7 @@ public:
   Direct_4(unsigned width, unsigned height, unsigned top_line = 0);
   ~Direct_4();
 
-  virtual void activate(Timing const &) override;
   virtual LineShape rasterize(unsigned, Pixel *) override;
-  virtual void deactivate() override;
 
   void flip();
   void flip_now();

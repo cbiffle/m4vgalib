@@ -25,12 +25,6 @@ Direct_4::~Direct_4() {
   _fb[0] = _fb[1] = nullptr;
 }
 
-void Direct_4::activate(Timing const &) {
-}
-
-void Direct_4::deactivate() {
-}
-
 __attribute__((section(".ramcode")))
 Rasterizer::LineShape Direct_4::rasterize(unsigned line_number, Pixel *target) {
   line_number -= _top_line;

@@ -28,12 +28,6 @@ Bitmap_1::~Bitmap_1() {
   _fb[0] = _fb[1] = nullptr;
 }
 
-void Bitmap_1::activate(Timing const &) {
-}
-
-void Bitmap_1::deactivate() {
-}
-
 __attribute__((section(".ramcode")))
 Rasterizer::LineShape Bitmap_1::rasterize(unsigned line_number, Pixel *target) {
   line_number -= _top_line;

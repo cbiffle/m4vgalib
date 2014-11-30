@@ -10,8 +10,8 @@ struct Timing;
 /*
  * A producer of pixels, one scanline at a time.  Some rasterizers may
  * generate pixels procedurally; others may use a backing framebuffer or
- * other store.  Either way, the rasterizer is responsible for allocating
- * its own resources from the arena.
+ * other store.  Either way, the rasterizer is responsible for either containing
+ * the resources it needs or allocating them from the arena.
  */
 class Rasterizer {
 public:
@@ -32,18 +32,6 @@ public:
   };
 
   /*
-   * Allocate resources associated with this Rasterizer, typically from the
-   * arena.  This is separated from construction so that Rasterizers can be
-   * declared statically.
-   *
-   * The Rasterizer is shown the current timings in case it wants to adapt to
-   * the screen resolution.
-   *
-   * The default implementation does nothing.
-   */
-  virtual void activate(Timing const &);
-
-  /*
    * Produces a single scanline of pixels into a scan buffer.  Returns the
    * number of pixels generated and an optional offset.
    *
@@ -51,15 +39,6 @@ public:
    * mode, not necessarily the first line handled by this Rasterizer!
    */
   virtual LineShape rasterize(unsigned line_number, Pixel *raster_target) = 0;
-
-  /*
-   * The opposite of activate.  In the usual case where rasterizer resources
-   * come from the arena, this doesn't have anything to do except perhaps zero
-   * some pointers.
-   *
-   * The default implementation does nothing.
-   */
-  virtual void deactivate();
 
 protected:
   ~Rasterizer() = default;

@@ -6,7 +6,6 @@ c_library('vga',
     'font_10x16.cc',
     'graphics_1.cc',
     'measurement.cc',
-    'rasterizer.cc',
     'timing.cc',
     'vga.cc',
 

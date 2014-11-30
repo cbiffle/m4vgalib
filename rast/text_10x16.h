@@ -13,9 +13,7 @@ public:
   Text_10x16(unsigned width, unsigned height, unsigned top_line = 0);
   ~Text_10x16();
 
-  virtual void activate(Timing const &) override;
   virtual LineShape rasterize(unsigned, Pixel *) override;
-  virtual void deactivate() override;
 
   void clear_framebuffer(Pixel);
 

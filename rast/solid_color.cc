@@ -10,12 +10,6 @@ SolidColor::SolidColor(unsigned width, Pixel color)
     _color(color) {}
 
 
-void SolidColor::activate(Timing const &) {
-}
-
-void SolidColor::deactivate() {
-}
-
 __attribute__((section(".ramcode")))
 Rasterizer::LineShape SolidColor::rasterize(unsigned, Pixel *target) {
   unsigned words = _width / 4;

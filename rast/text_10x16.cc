@@ -19,7 +19,7 @@ Text_10x16::Text_10x16(unsigned width, unsigned height, unsigned top_line)
     _top_line(top_line),
     _x_adj(0) {}
 
-void Text_10x16::activate(Timing const &timing) {
+void Text_10x16::activate(Timing const &) {
   _font = arena_new_array<unsigned char>(chars_in_font * glyph_rows);
   _fb = arena_new_array<unsigned>(_cols * _rows);
 

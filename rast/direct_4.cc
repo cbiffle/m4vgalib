@@ -11,22 +11,24 @@ namespace rast {
 Direct_4::Direct_4(unsigned width, unsigned height, unsigned top_line)
   : _width(width),
     _height(height),
-    _top_line(top_line) {}
-
-
-void Direct_4::activate(Timing const &) {
-  _fb[0] = arena_new_array<unsigned char>(_width * _height);
-  _fb[1] = arena_new_array<unsigned char>(_width * _height);
-  _page1 = false;
-
+    _top_line(top_line),
+    _page1(false),
+    _fb{arena_new_array<unsigned char>(_width * _height),
+        arena_new_array<unsigned char>(_width * _height)} {
   for (unsigned i = 0; i < _width * _height; ++i) {
     _fb[0][i] = 0;
     _fb[1][i] = 0;
   }
 }
 
-void Direct_4::deactivate() {
+Direct_4::~Direct_4() {
   _fb[0] = _fb[1] = nullptr;
+}
+
+void Direct_4::activate(Timing const &) {
+}
+
+void Direct_4::deactivate() {
 }
 
 __attribute__((section(".ramcode")))

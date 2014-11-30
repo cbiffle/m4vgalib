@@ -28,6 +28,13 @@ struct Band {
 
 void configure_band_list(Band const *head);
 
+/*
+ * Switches the driver band list for an empty list and synchronizes with the
+ * driver to ensure that the change has been made.  This is useful to disconnect
+ * a rasterizer from the driver before destruction.
+ */
+void clear_band_list();
+
 void wait_for_vblank();
 
 bool in_vblank();

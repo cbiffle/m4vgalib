@@ -17,18 +17,21 @@ namespace rast {
 Bitmap_1::Bitmap_1(unsigned width, unsigned height, unsigned top_line)
   : _lines(height),
     _words_per_line(width / 32),
-    _top_line(top_line) {}
+    _top_line(top_line),
+    _page1(false),
+    _clut{ 0, 0xFF },
+    _fb{ arena_new_array<uint32_t>(_words_per_line * _lines),
+         arena_new_array<uint32_t>(_words_per_line * _lines) }
+{}
+
+Bitmap_1::~Bitmap_1() {
+  _fb[0] = _fb[1] = nullptr;
+}
 
 void Bitmap_1::activate(Timing const &) {
-  _fb[0] = arena_new_array<uint32_t>(_words_per_line * _lines);
-  _fb[1] = arena_new_array<uint32_t>(_words_per_line * _lines);
-  _page1 = false;
-  _clut[0] = 0;
-  _clut[1] = 0xFF;
 }
 
 void Bitmap_1::deactivate() {
-  _fb[0] = _fb[1] = nullptr;
 }
 
 __attribute__((section(".ramcode")))

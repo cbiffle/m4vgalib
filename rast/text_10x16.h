@@ -1,6 +1,8 @@
 #ifndef VGA_RAST_TEXT_10X16_H
 #define VGA_RAST_TEXT_10X16_H
 
+#include <cstdint>
+
 #include "vga/rasterizer.h"
 
 namespace vga {
@@ -9,6 +11,7 @@ namespace rast {
 class Text_10x16 : public Rasterizer {
 public:
   Text_10x16(unsigned width, unsigned height, unsigned top_line = 0);
+  ~Text_10x16();
 
   virtual void activate(Timing const &) override;
   virtual LineShape rasterize(unsigned, Pixel *) override;
@@ -26,10 +29,10 @@ public:
 private:
   unsigned _cols;
   unsigned _rows;
-  unsigned *_fb;
-  unsigned char *_font;
   unsigned _top_line;
   int _x_adj;
+  std::uint8_t * _font;
+  std::uint32_t * _fb;
 };
 
 }  // namespace rast

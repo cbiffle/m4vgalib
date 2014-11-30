@@ -1,5 +1,6 @@
 #include "vga/vga.h"
 
+#include <atomic>
 #include <cstdint>
 #include <cstddef>
 
@@ -113,6 +114,7 @@ static Rasterizer::LineShape working_buffer_shape;
 
 static Band const *band_list_head;
 static Band current_band;
+static std::atomic<bool> band_list_taken{false};
 
 
 /*******************************************************************************
@@ -148,6 +150,7 @@ void init() {
                   .with_prften(true));
 
   band_list_head = nullptr;
+  band_list_taken = false;
 
   sync_off();
   video_off();
@@ -310,6 +313,12 @@ void configure_timing(Timing const &timing) {
 
 void configure_band_list(Band const *head) {
   band_list_head = head;
+  band_list_taken = false;
+}
+
+void clear_band_list() {
+  configure_band_list(nullptr);
+  while (!band_list_taken) etl::armv7m::wait_for_interrupt();
 }
 
 void wait_for_vblank() {
@@ -454,6 +463,7 @@ static void end_of_active_video() {
     } else {
       vga::current_band = { nullptr, 0, nullptr };
     }
+    vga::band_list_taken = true;
   } else if (line == timing.video_start_line) {
     // Time to start output.
     vga::state = vga::State::active;

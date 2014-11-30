@@ -14,6 +14,7 @@ namespace rast {
 class Direct_4 : public Rasterizer {
 public:
   Direct_4(unsigned width, unsigned height, unsigned top_line = 0);
+  ~Direct_4();
 
   virtual void activate(Timing const &) override;
   virtual LineShape rasterize(unsigned, Pixel *) override;
@@ -26,11 +27,11 @@ public:
   unsigned char *get_bg_buffer() const { return _fb[!_page1]; }
 
 private:
-  unsigned char *_fb[2];
   unsigned _width;
   unsigned _height;
   unsigned _top_line;
   bool _page1;
+  unsigned char *_fb[2];
 };
 
 }  // namespace rast

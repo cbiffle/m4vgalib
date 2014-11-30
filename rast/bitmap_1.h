@@ -13,6 +13,7 @@ namespace rast {
 class Bitmap_1 : public Rasterizer {
 public:
   Bitmap_1(unsigned width, unsigned height, unsigned top_line = 0);
+  ~Bitmap_1();
 
   virtual void activate(Timing const &) override;
   virtual LineShape rasterize(unsigned, Pixel *) override;
@@ -34,12 +35,12 @@ public:
   void copy_bg_to_fg() const;
 
 private:
-  std::uint32_t *_fb[2];
   unsigned _lines;
   unsigned _words_per_line;
   unsigned _top_line;
   bool _page1;
   Pixel _clut[2];
+  std::uint32_t *_fb[2];
 };
 
 }  // namespace rast

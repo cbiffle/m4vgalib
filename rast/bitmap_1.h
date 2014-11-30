@@ -14,9 +14,9 @@ class Bitmap_1 : public Rasterizer {
 public:
   Bitmap_1(unsigned width, unsigned height, unsigned top_line = 0);
 
-  virtual void activate(Timing const &);
-  virtual LineShape rasterize(unsigned, Pixel *);
-  virtual void deactivate();
+  virtual void activate(Timing const &) override;
+  virtual LineShape rasterize(unsigned, Pixel *) override;
+  virtual void deactivate() override;
 
   Bitmap get_bg_bitmap() const;
   Graphics1 make_bg_graphics() const;

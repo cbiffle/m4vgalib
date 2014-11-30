@@ -10,9 +10,9 @@ class Text_10x16 : public Rasterizer {
 public:
   Text_10x16(unsigned width, unsigned height, unsigned top_line = 0);
 
-  virtual void activate(Timing const &);
-  virtual LineShape rasterize(unsigned, Pixel *);
-  virtual void deactivate();
+  virtual void activate(Timing const &) override;
+  virtual LineShape rasterize(unsigned, Pixel *) override;
+  virtual void deactivate() override;
 
   void clear_framebuffer(Pixel);
 

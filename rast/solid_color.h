@@ -10,9 +10,9 @@ class SolidColor : public Rasterizer {
 public:
   SolidColor(unsigned width, Pixel color);
 
-  virtual void activate(Timing const &);
-  virtual LineShape rasterize(unsigned, Pixel *);
-  virtual void deactivate();
+  virtual void activate(Timing const &) override;
+  virtual LineShape rasterize(unsigned, Pixel *) override;
+  virtual void deactivate() override;
 
   void set_color(Pixel);
 

@@ -15,9 +15,9 @@ class Direct_2 : public Rasterizer {
 public:
   Direct_2(unsigned width, unsigned height, unsigned top_line = 0);
 
-  virtual void activate(Timing const &);
-  virtual LineShape rasterize(unsigned, Pixel *);
-  virtual void deactivate();
+  virtual void activate(Timing const &) override;
+  virtual LineShape rasterize(unsigned, Pixel *) override;
+  virtual void deactivate() override;
 
   void flip();
   void flip_now();

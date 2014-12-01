@@ -13,6 +13,9 @@ public:
   Text_10x16(unsigned width, unsigned height, unsigned top_line = 0);
   ~Text_10x16();
 
+  unsigned get_col_count() const { return _cols; }
+  unsigned get_row_count() const { return _rows; }
+
   virtual LineShape rasterize(unsigned, Pixel *) override;
 
   void clear_framebuffer(Pixel);

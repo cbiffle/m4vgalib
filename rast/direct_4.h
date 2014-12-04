@@ -21,6 +21,8 @@ public:
   void flip();
   void flip_now();
 
+  unsigned get_width() const { return _width; }
+  unsigned get_height() const { return _height; }
   unsigned char *get_fg_buffer() const { return _fb[_page1]; }
   unsigned char *get_bg_buffer() const { return _fb[!_page1]; }
 

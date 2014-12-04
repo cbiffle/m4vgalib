@@ -11,10 +11,12 @@ c_library('vga',
 
     'rast/bitmap_1.cc',
     'rast/direct_4.cc',
+    'rast/direct_4_mirror.cc',
     'rast/solid_color.cc',
     'rast/text_10x16.cc',
     'rast/unpack_1bpp.S',
     'rast/unpack_direct_x4.S',
+    'rast/unpack_direct_x4_rev.S',
     'rast/unpack_text_10p_attributed.S',
   ],
   local = {

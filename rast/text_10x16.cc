@@ -11,10 +11,14 @@ namespace rast {
 static constexpr unsigned glyph_cols = 10, glyph_rows = 16;
 static constexpr unsigned chars_in_font = 256;
 
-Text_10x16::Text_10x16(unsigned width, unsigned height, unsigned top_line)
+Text_10x16::Text_10x16(unsigned width,
+                       unsigned height,
+                       unsigned top_line,
+                       bool hide_right)
   : _cols((width + (glyph_cols - 1)) / glyph_cols),
     _rows((height + (glyph_rows - 1)) / glyph_rows),
     _top_line(top_line),
+    _hide_right(hide_right),
     _x_adj(0),
     _font(arena_new_array<std::uint8_t>(chars_in_font * glyph_rows)),
     _fb(arena_new_array<std::uint32_t>(_cols * _rows)) {
@@ -43,9 +47,17 @@ Rasterizer::LineShape Text_10x16::rasterize(unsigned line_number,
   std::uint32_t const *src = _fb + _cols * text_row;
   std::uint8_t const *font = _font + row_in_glyph * chars_in_font;
 
+  std::uint8_t bg = *src >> 8;
+  for (int i = 0; i < _x_adj; ++i) raster_target[i] = bg;
+
+  bg = *(src + _cols - 1) >> 8;
+  for (int i = _cols * glyph_cols + _x_adj; i < int(_cols * glyph_cols); ++i) {
+    raster_target[i] = bg;
+  }
+
   unpack_text_10p_attributed_impl(src, font, raster_target + _x_adj, _cols);
 
-  return { 0, _cols * glyph_cols };
+  return { 0, _cols * glyph_cols - (_hide_right * glyph_cols) };
 }
 
 void Text_10x16::clear_framebuffer(Pixel bg) {

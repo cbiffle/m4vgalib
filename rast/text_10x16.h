@@ -10,7 +10,9 @@ namespace rast {
 
 class Text_10x16 : public Rasterizer {
 public:
-  Text_10x16(unsigned width, unsigned height, unsigned top_line = 0);
+  Text_10x16(unsigned width, unsigned height,
+             unsigned top_line = 0,
+             bool hide_right = false);
   ~Text_10x16();
 
   unsigned get_col_count() const { return _cols; }
@@ -26,11 +28,13 @@ public:
   void put_packed(unsigned col, unsigned row, unsigned p);
 
   void set_x_adj(int v) { _x_adj = v; }
+  void set_top_line(unsigned top_line) { _top_line = top_line; }
 
 private:
   unsigned _cols;
   unsigned _rows;
   unsigned _top_line;
+  bool _hide_right;
   int _x_adj;
   std::uint8_t * _font;
   std::uint32_t * _fb;

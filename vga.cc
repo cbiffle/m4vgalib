@@ -108,7 +108,11 @@ static Pixel scan_buffer[max_pixels_per_line + 4];
 // It should be close to the CPU and need not be DMA-capable.
 // It's aligned to make copying it more efficient.
 alignas(4) IN_LOCAL_RAM
-static Pixel working_buffer[max_pixels_per_line];
+static struct {
+  Pixel left_pad[16];
+  Pixel buffer[max_pixels_per_line];
+  Pixel right_pad[16];
+} working;
 
 static Rasterizer::LineShape working_buffer_shape;
 
@@ -283,9 +287,9 @@ void configure_timing(Timing const &timing) {
   }
 
   // Scribble over working buffer to help catch bugs.
-  for (size_t i = 0; i < sizeof(working_buffer); i += 2) {
-    working_buffer[i] = 0xFF;
-    working_buffer[i + 1] = 0x00;
+  for (size_t i = 0; i < sizeof(working.buffer); i += 2) {
+    working.buffer[i] = 0xFF;
+    working.buffer[i + 1] = 0x00;
   }
 
   // Blank the final four pixels of the scan buffer.
@@ -537,7 +541,7 @@ void etl_armv7m_pend_sv_handler() {
     ((Word *) (void *) vga::scan_buffer)[
         vga::working_buffer_shape.length / 4] = 0;
     copy_words(reinterpret_cast<Word const *>(
-                   static_cast<void *>(vga::working_buffer)),
+                   static_cast<void *>(vga::working.buffer)),
                reinterpret_cast<Word *>(
                    static_cast<void *>(vga::scan_buffer)),
                vga::working_buffer_shape.length / 4);
@@ -548,7 +552,7 @@ void etl_armv7m_pend_sv_handler() {
       vga::Rasterizer *r = get_next_rasterizer();
       if (r) {
         vga::Rasterizer::LineShape shape = r->rasterize(visible_line,
-                                                        vga::working_buffer);
+                                                        vga::working.buffer);
         vga::working_buffer_shape = shape;
         tim8.write_ccr2(timing.sync_pixels
                         + timing.back_porch_pixels - timing.video_lead

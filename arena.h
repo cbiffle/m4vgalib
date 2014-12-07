@@ -56,6 +56,10 @@ public:
   }
   ArenaPtr(ArenaPtr const &) = delete;
 
+  explicit operator bool() const {
+    return bool(_ptr);
+  }
+
   ArenaPtr & operator=(ArenaPtr && other) {
     clear();
     _ptr = other._ptr;

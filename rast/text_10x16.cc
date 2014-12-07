@@ -2,21 +2,22 @@
 
 #include "vga/arena.h"
 #include "vga/timing.h"
-#include "vga/font_10x16.h"
 #include "vga/rast/unpack_text_10p_attributed.h"
 
 namespace vga {
 namespace rast {
 
 static constexpr unsigned glyph_cols = 10, glyph_rows = 16;
-static constexpr unsigned chars_in_font = 256;
 
-Text_10x16::Text_10x16(unsigned width,
+Text_10x16::Text_10x16(std::uint8_t const * font,
+                       unsigned chars_in_font,
+                       unsigned width,
                        unsigned height,
                        unsigned top_line,
                        bool hide_right)
   : _cols((width + (glyph_cols - 1)) / glyph_cols),
     _rows((height + (glyph_rows - 1)) / glyph_rows),
+    _chars_in_font(chars_in_font),
     _top_line(top_line),
     _hide_right(hide_right),
     _x_adj(0),
@@ -24,7 +25,7 @@ Text_10x16::Text_10x16(unsigned width,
     _fb(arena_new_array<std::uint32_t>(_cols * _rows)) {
   // Copy font into RAM for fast deterministic access.
   for (unsigned i = 0; i < chars_in_font * glyph_rows; ++i) {
-    _font[i] = font_10x16[i];
+    _font[i] = font[i];
   }
 }
 
@@ -45,7 +46,7 @@ Rasterizer::LineShape Text_10x16::rasterize(unsigned line_number,
   if (text_row >= _rows) return { 0, 0 };
 
   std::uint32_t const *src = _fb + _cols * text_row;
-  std::uint8_t const *font = _font + row_in_glyph * chars_in_font;
+  std::uint8_t const *font = _font + row_in_glyph * _chars_in_font;
 
   std::uint8_t bg = *src >> 8;
   for (int i = 0; i < _x_adj; ++i) raster_target[i] = bg;

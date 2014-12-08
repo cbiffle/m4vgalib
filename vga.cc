@@ -448,6 +448,14 @@ RAM_CODE
 static void end_of_active_video() {
   vga::Timing const &timing = vga::current_timing;
 
+  // Apply timing changes requested by the last rasterizer.
+  tim8.write_ccr2(timing.sync_pixels
+                  + timing.back_porch_pixels - timing.video_lead
+                  + vga::working_buffer_shape.offset);
+
+  // Pend a PendSV to process hblank tasks.
+  scb.write_icsr(Scb::icsr_value_t().with_pendsvset(true));
+
   // CC3 indicates end of active video (start of front porch).
   unsigned line = vga::current_line;
 
@@ -479,8 +487,6 @@ static void end_of_active_video() {
 
   vga::current_line = line + 1;
 
-  // Pend a PendSV to process hblank tasks.
-  scb.write_icsr(Scb::icsr_value_t().with_pendsvset(true));
 }
 
 RAM_CODE void etl_stm32f4xx_tim1_cc_handler() {
@@ -529,10 +535,7 @@ static vga::Rasterizer *get_next_rasterizer() {
 
 RAM_CODE
 void etl_armv7m_pend_sv_handler() {
-  vga_hblank_interrupt();
-
   if (is_rendered_state(vga::state)) {
-    vga::Timing const &timing = vga::current_timing;
     // Flip working_buffer into scan_buffer.
     // We know its contents are ready because otherwise we wouldn't take a new
     // PendSV.
@@ -545,19 +548,21 @@ void etl_armv7m_pend_sv_handler() {
                reinterpret_cast<Word *>(
                    static_cast<void *>(vga::scan_buffer)),
                vga::working_buffer_shape.length / 4);
+  }
 
+  vga_hblank_interrupt();
+
+  if (is_rendered_state(vga::state)) {
+    vga::Timing const &timing = vga::current_timing;
     unsigned line = vga::current_line;
     if (line >= timing.video_start_line && line <= timing.video_end_line) {
       unsigned visible_line = line - timing.video_start_line;
       vga::Rasterizer *r = get_next_rasterizer();
       if (r) {
-        vga::Rasterizer::LineShape shape = r->rasterize(visible_line,
-                                                        vga::working.buffer);
-        vga::working_buffer_shape = shape;
-        tim8.write_ccr2(timing.sync_pixels
-                        + timing.back_porch_pixels - timing.video_lead
-                        + shape.offset);
+        vga::working_buffer_shape = r->rasterize(visible_line,
+                                                 vga::working.buffer);
       }
     }
   }
+
 }

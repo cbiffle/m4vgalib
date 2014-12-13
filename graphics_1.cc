@@ -55,22 +55,28 @@ void Graphics1::clear_all() {
  * Bresenham-style line drawing.
  */
 
+enum class Graphics1::Direction : bool {
+  horizontal = true,
+  vertical = false,
+};
+
 /*
- * The meat of the line drawing algorithm, specialized on two parameters:
+ * The meat of the line drawing algorithm, specialized on three parameters:
  *
  * - S tells whether pixels should be set (true) or cleared (false).
- * - H tells whether the line is primarily horizontal (true) or vertical
+ * - D tells whether the line is primarily horizontal (true) or vertical
  *   (false).  This gives the line's major axis.
+ * - XAdv is either -1 or 1, and gives the direction of movement on the X
+ *   axis (Y is always positive).
  */
-template <bool S, bool H>
+template <bool S, Graphics1::Direction D, int XAdv>
 inline void Graphics1::draw_line_unclipped_spec(unsigned *out,
-                                                int dx, int dy,
-                                                int dir) {
-  int dmajor = H ? dx : dy;
-  int dminor = H ? dy : dx;
+                                                int dx, int dy) {
+  int dmajor = D == Direction::horizontal ? dx : dy;
+  int dminor = D == Direction::horizontal ? dy : dx;
 
-  int minor_step = H ? _b.width_px : dir;
-  int major_step = H ? dir : _b.width_px;
+  int minor_step = D == Direction::horizontal ? _b.width_px : XAdv;
+  int major_step = D == Direction::horizontal ? XAdv : _b.width_px;
 
   int dminor2 = dminor * 2;
   int dmajor2 = dmajor * 2;
@@ -104,16 +110,16 @@ inline void Graphics1::draw_line_unclipped(int x0, int y0, int x1, int y1) {
 
   if (dx > 0) {  // Drawing to the left
     if (dx > dy) {  // Primarily horizontal (X is major axis)
-      draw_line_unclipped_spec<S, true>(out, dx, dy, 1);
+      draw_line_unclipped_spec<S, Direction::horizontal, 1>(out, dx, dy);
     } else {  // Primarily vertical (Y is major axis)
-      draw_line_unclipped_spec<S, false>(out, dx, dy, 1);
+      draw_line_unclipped_spec<S, Direction::vertical, 1>(out, dx, dy);
     }
   } else {  // Drawing to the right/straight up
     dx = -dx;  // dx is nonnegative now.
     if (dx > dy) {  // Primarily horizontal (X is major axis)
-      draw_line_unclipped_spec<S, true>(out, dx, dy, -1);
+      draw_line_unclipped_spec<S, Direction::horizontal, -1>(out, dx, dy);
     } else {  // Primarily vertical (Y is major axis)
-      draw_line_unclipped_spec<S, false>(out, dx, dy, -1);
+      draw_line_unclipped_spec<S, Direction::vertical, -1>(out, dx, dy);
     }
   }
 }

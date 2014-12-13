@@ -103,8 +103,10 @@ private:
   template <bool S>
   inline void draw_line_unclipped(int x1, int y1, int x2, int y2);
 
-  template <bool S, bool H>
-  inline void draw_line_unclipped_spec(unsigned *, int, int, int);
+  enum class Direction : bool;
+
+  template <bool, Direction, int>
+  inline void draw_line_unclipped_spec(unsigned *, int, int);
 };
 
 }  // namespace vga

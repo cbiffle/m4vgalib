@@ -108,6 +108,47 @@ inline void Graphics1::draw_line_unclipped(int x0, int y0, int x1, int y1) {
 
   unsigned *out = bit_addr(x0, y0);
 
+  if (dx == 0) {
+    // Vertical line.
+    // Note that dy is nonnegative.
+    int step = _b.width_px;
+    while (dy--) {
+      *out = S;
+      out += step;
+    }
+    return;
+  }
+
+  if (dy == 0) {
+    // Horizontal line.
+    int step = dx > 0 ? 1 : -1;
+    while (dx -= step) {
+      *out = S;
+      out += step;
+    }
+    return;
+  }
+
+  if (dy == dx) {
+    // Diagonal line to lower left.
+    int step = _b.width_px + 1;
+    while (dy--) {
+      *out = S;
+      out += step;
+    }
+    return;
+  }
+
+  if (dy == -dx) {
+    // Diagonal line to lower right.
+    int step = _b.width_px - 1;
+    while (dy--) {
+      *out = S;
+      out += step;
+    }
+    return;
+  }
+
   if (dx > 0) {  // Drawing to the left
     if (dx > dy) {  // Primarily horizontal (X is major axis)
       draw_line_unclipped_spec<S, Direction::horizontal, 1>(out, dx, dy);

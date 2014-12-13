@@ -25,7 +25,6 @@ c_library('vga',
     'rast/unpack_text_10p_attributed.S',
   ],
   local = {
-    # TODO(cbiffle): is this helpful?
     'cxx_flags': [ '-O2' ],
   },
   deps = [

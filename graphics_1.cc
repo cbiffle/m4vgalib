@@ -168,7 +168,6 @@ inline void Graphics1::draw_line_unclipped(int x0, int y0, int x1, int y1) {
 /*
  * We only expose the unclipped version to users in this one flavor:
  */
-RAMCODE("Graphics1.set_line_unclipped.int")
 void Graphics1::set_line_unclipped(int x1, int y1, int x2, int y2) {
   draw_line_unclipped<true>(x1, y1, x2, y2);
 }

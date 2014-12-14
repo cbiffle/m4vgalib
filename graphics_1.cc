@@ -1,5 +1,6 @@
 #include "vga/graphics_1.h"
 
+#include "etl/prediction.h"
 #include "etl/utility.h"
 
 #define RAMCODE(sub) __attribute__((section(".ramcode." sub)))
@@ -108,7 +109,7 @@ inline void Graphics1::draw_line_unclipped(int x0, int y0, int x1, int y1) {
 
   unsigned *out = bit_addr(x0, y0);
 
-  if (dx == 0) {
+  if (ETL_UNLIKELY(dx == 0)) {
     // Vertical line.
     // Note that dy is nonnegative.
     int step = _b.width_px;
@@ -119,7 +120,7 @@ inline void Graphics1::draw_line_unclipped(int x0, int y0, int x1, int y1) {
     return;
   }
 
-  if (dy == 0) {
+  if (ETL_UNLIKELY(dy == 0)) {
     // Horizontal line.
     int step = dx > 0 ? 1 : -1;
     while (dx -= step) {
@@ -129,7 +130,7 @@ inline void Graphics1::draw_line_unclipped(int x0, int y0, int x1, int y1) {
     return;
   }
 
-  if (dy == dx) {
+  if (ETL_UNLIKELY(dy == dx)) {
     // Diagonal line to lower left.
     int step = _b.width_px + 1;
     while (dy--) {
@@ -139,7 +140,7 @@ inline void Graphics1::draw_line_unclipped(int x0, int y0, int x1, int y1) {
     return;
   }
 
-  if (dy == -dx) {
+  if (ETL_UNLIKELY(dy == -dx)) {
     // Diagonal line to lower right.
     int step = _b.width_px - 1;
     while (dy--) {

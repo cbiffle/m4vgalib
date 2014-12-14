@@ -355,93 +355,93 @@ __attribute__((noinline))
 static void start_of_active_video() {
   // CC2 indicates start of active video (end of back porch).
   // This only matters in displayed states.
-  if (is_displayed_state(vga::state)) {
-    // Clear stream 1 flags (lifcr is a write-1-to-clear register).
-    dma2.write_lifcr(Dma::lifcr_value_t()
-                     .with_cdmeif1(true)
-                     .with_cteif1(true)
-                     .with_chtif1(true)
-                     .with_ctcif1(true));
+  if (!is_displayed_state(vga::state)) return;
 
-    auto &st = dma2.stream1;
+  // Clear stream 1 flags (lifcr is a write-1-to-clear register).
+  dma2.write_lifcr(Dma::lifcr_value_t()
+                   .with_cdmeif1(true)
+                   .with_cteif1(true)
+                   .with_chtif1(true)
+                   .with_ctcif1(true));
 
-    // Prepare to transfer pixels as words, plus the final black word.
-    st.write_ndtr(vga::working_buffer_shape.length / 4 + 1);
+  auto &st = dma2.stream1;
 
-    // Set addresses.  Note that we're using memory as the peripheral side.
-    // This DMA controller is a little odd.
-    st.write_par(reinterpret_cast<Word>(&vga::scan_buffer));
-    st.write_m0ar(0x40021015);  // High byte of GPIOE ODR (hack hack)
+  // Prepare to transfer pixels as words, plus the final black word.
+  st.write_ndtr(vga::working_buffer_shape.length / 4 + 1);
 
-    // Configure FIFO.
-    st.write_fcr(Dma::Stream::fcr_value_t()
-                 .with_fth(Dma::Stream::fcr_value_t::fth_t::quarter)
-                 .with_dmdis(true)
-                 .with_feie(false));
+  // Set addresses.  Note that we're using memory as the peripheral side.
+  // This DMA controller is a little odd.
+  st.write_par(reinterpret_cast<Word>(&vga::scan_buffer));
+  st.write_m0ar(0x40021015);  // High byte of GPIOE ODR (hack hack)
 
-    /*
-     * Configure and enable the DMA stream.  The configuration used here
-     * deserves more discussion.
-     *
-     * As noted above, our "peripheral" is RAM and our "memory" is the GPIO
-     * unit.  In memory-to-memory mode (which we use) the distinction is
-     * not useful, since the peripherals are memory-mapped; the controller
-     * insists that "peripheral" be source and "memory" be destination in that
-     * mode.  The key here is that the transfer runs at full speed.  On the
-     * STM32F407 the transfer will not exceed one unit per 4 AHB cycles.  The
-     * reason for this is not obvious.
-     *
-     * Address incrementation on this chip is independent from whether an
-     * address is considered "peripheral" or "memory."  Here we auto-increment
-     * the peripheral address (to walk through the scan buffer) while leaving
-     * the memory address fixed (at the appropriate byte of the GPIO port).
-     *
-     * Because we're using memory-to-memory, the hardware enforces several
-     * restrictions:
-     *
-     *  1. We're stuck using DMA2.  DMA1 can't do it.
-     *  2. We're required to use the FIFO -- direct mode is verboten.
-     *  3. We can't use circular mode.  (Double-buffer mode appears permitted,
-     *     but I haven't tried it.)
-     *
-     * Fortunately we can tie the FIFO to a tree by giving it a really low
-     * threshold level.
-     *
-     * I have not experimented with burst modes, but I suspect they'll make
-     * the timing less regular.
-     *
-     * Note that the priority (pl field) is only used for arbitration between
-     * streams of the same DMA controller.  The STM32F4 does not provide any
-     * control over the AHB matrix arbitration scheme, unlike (say) the NXP
-     * LPC1788.  Shame, that.  It means we have to be very careful about our
-     * use of the bus matrix during scan-out.
-     */
-    typedef Dma::Stream::cr_value_t cr_t;
-    st.write_cr(Dma::Stream::cr_value_t()
-                // Originally chosen to play nice with TIM8.  Now, arbitrary.
-                .with_chsel(7)
-                .with_pl(cr_t::pl_t::very_high)
-                .with_dir(cr_t::dir_t::memory_to_memory)
-                // Input settings:
-                .with_pburst(Dma::Stream::BurstSize::single)
-                .with_psize(Dma::Stream::TransferSize::word)
-                .with_pinc(true)
-                // Output settings:
-                .with_mburst(Dma::Stream::BurstSize::single)
-                .with_msize(Dma::Stream::TransferSize::byte)
-                .with_minc(false)
-                // Look at all these options we don't use:
-                .with_dbm(false)
-                .with_pincos(false)
-                .with_circ(false)
-                .with_pfctrl(false)
-                .with_tcie(false)
-                .with_htie(false)
-                .with_teie(false)
-                .with_dmeie(false)
-                // Finally, enable.
-                .with_en(true));
-  }
+  // Configure FIFO.
+  st.write_fcr(Dma::Stream::fcr_value_t()
+               .with_fth(Dma::Stream::fcr_value_t::fth_t::quarter)
+               .with_dmdis(true)
+               .with_feie(false));
+
+  /*
+   * Configure and enable the DMA stream.  The configuration used here
+   * deserves more discussion.
+   *
+   * As noted above, our "peripheral" is RAM and our "memory" is the GPIO
+   * unit.  In memory-to-memory mode (which we use) the distinction is
+   * not useful, since the peripherals are memory-mapped; the controller
+   * insists that "peripheral" be source and "memory" be destination in that
+   * mode.  The key here is that the transfer runs at full speed.  On the
+   * STM32F407 the transfer will not exceed one unit per 4 AHB cycles.  The
+   * reason for this is not obvious.
+   *
+   * Address incrementation on this chip is independent from whether an
+   * address is considered "peripheral" or "memory."  Here we auto-increment
+   * the peripheral address (to walk through the scan buffer) while leaving
+   * the memory address fixed (at the appropriate byte of the GPIO port).
+   *
+   * Because we're using memory-to-memory, the hardware enforces several
+   * restrictions:
+   *
+   *  1. We're stuck using DMA2.  DMA1 can't do it.
+   *  2. We're required to use the FIFO -- direct mode is verboten.
+   *  3. We can't use circular mode.  (Double-buffer mode appears permitted,
+   *     but I haven't tried it.)
+   *
+   * Fortunately we can tie the FIFO to a tree by giving it a really low
+   * threshold level.
+   *
+   * I have not experimented with burst modes, but I suspect they'll make
+   * the timing less regular.
+   *
+   * Note that the priority (pl field) is only used for arbitration between
+   * streams of the same DMA controller.  The STM32F4 does not provide any
+   * control over the AHB matrix arbitration scheme, unlike (say) the NXP
+   * LPC1788.  Shame, that.  It means we have to be very careful about our
+   * use of the bus matrix during scan-out.
+   */
+  typedef Dma::Stream::cr_value_t cr_t;
+  st.write_cr(Dma::Stream::cr_value_t()
+              // Originally chosen to play nice with TIM8.  Now, arbitrary.
+              .with_chsel(7)
+              .with_pl(cr_t::pl_t::very_high)
+              .with_dir(cr_t::dir_t::memory_to_memory)
+              // Input settings:
+              .with_pburst(Dma::Stream::BurstSize::single)
+              .with_psize(Dma::Stream::TransferSize::word)
+              .with_pinc(true)
+              // Output settings:
+              .with_mburst(Dma::Stream::BurstSize::single)
+              .with_msize(Dma::Stream::TransferSize::byte)
+              .with_minc(false)
+              // Look at all these options we don't use:
+              .with_dbm(false)
+              .with_pincos(false)
+              .with_circ(false)
+              .with_pfctrl(false)
+              .with_tcie(false)
+              .with_htie(false)
+              .with_teie(false)
+              .with_dmeie(false)
+              // Finally, enable.
+              .with_en(true));
 }
 
 RAM_CODE

@@ -1,6 +1,8 @@
 #ifndef VGA_RAST_DIRECT_4_H
 #define VGA_RAST_DIRECT_4_H
 
+#include <atomic>
+
 #include "vga/rasterizer.h"
 
 namespace vga {
@@ -18,7 +20,7 @@ public:
 
   virtual LineShape rasterize(unsigned, Pixel *) override;
 
-  void flip();
+  void pend_flip();
   void flip_now();
 
   unsigned get_width() const { return _width; }
@@ -31,6 +33,7 @@ private:
   unsigned _height;
   unsigned _top_line;
   bool _page1;
+  std::atomic<bool> _flip_pended;
   unsigned char *_fb[2];
 };
 

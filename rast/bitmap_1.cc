@@ -3,6 +3,7 @@
 #include <cstdint>
 
 #include "etl/assert.h"
+#include "etl/prediction.h"
 
 #include "vga/arena.h"
 #include "vga/copy_words.h"
@@ -19,6 +20,7 @@ Bitmap_1::Bitmap_1(unsigned width, unsigned height, unsigned top_line)
     _words_per_line(width / 32),
     _top_line(top_line),
     _page1(false),
+    _flip_pended(false),
     _clut{ 0, 0xFF },
     _fb{ arena_new_array<uint32_t>(_words_per_line * _lines),
          arena_new_array<uint32_t>(_words_per_line * _lines) }
@@ -31,7 +33,11 @@ Bitmap_1::~Bitmap_1() {
 __attribute__((section(".ramcode")))
 Rasterizer::LineShape Bitmap_1::rasterize(unsigned line_number, Pixel *target) {
   line_number -= _top_line;
-  if (line_number >= _lines) return { 0, 0 };
+  if (ETL_UNLIKELY(line_number == 0)) {
+    if (_flip_pended.exchange(false)) flip_now();
+  } else if (ETL_UNLIKELY(line_number >= _lines)) {
+    return { 0, 0 };
+  }
 
   uint32_t const *src = _fb[_page1] + _words_per_line * line_number;
 
@@ -53,9 +59,8 @@ Graphics1 Bitmap_1::make_bg_graphics() const {
   return Graphics1(get_bg_bitmap());
 }
 
-void Bitmap_1::flip() {
-  vga::sync_to_vblank();
-  _page1 = !_page1;
+void Bitmap_1::pend_flip() {
+  _flip_pended = true;
 }
 
 void Bitmap_1::flip_now() {

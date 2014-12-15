@@ -1,6 +1,7 @@
 #ifndef VGA_RAST_BITMAP_1_H
 #define VGA_RAST_BITMAP_1_H
 
+#include <atomic>
 #include <cstdint>
 
 #include "vga/bitmap.h"
@@ -19,7 +20,15 @@ public:
 
   Bitmap get_bg_bitmap() const;
   Graphics1 make_bg_graphics() const;
-  void flip();
+
+  /*
+   * Flips the display pages at the next vblank.
+   */
+  void pend_flip();
+
+  /*
+   * Flips the display pages right fricking now.
+   */
   void flip_now();
 
   void set_fg_color(Pixel);
@@ -37,6 +46,7 @@ private:
   unsigned _words_per_line;
   unsigned _top_line;
   bool _page1;
+  std::atomic<bool> _flip_pended;
   Pixel _clut[2];
   std::uint32_t *_fb[2];
 };

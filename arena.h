@@ -56,6 +56,11 @@ public:
   }
   ArenaPtr(ArenaPtr const &) = delete;
 
+  template <typename U>
+  ArenaPtr(ArenaPtr<U> && other) : _ptr(other._ptr) {
+    other._ptr = nullptr;
+  }
+
   explicit operator bool() const {
     return bool(_ptr);
   }
@@ -90,6 +95,9 @@ public:
 
 private:
   T * _ptr;
+
+  template <typename U>
+  friend class ArenaPtr;
 };
 
 /*

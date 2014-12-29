@@ -16,6 +16,12 @@ namespace vga {
 namespace rast {
 
 Bitmap_1::Bitmap_1(unsigned width, unsigned height, unsigned top_line)
+  : Bitmap_1(width, height, nullptr, top_line) {}
+
+Bitmap_1::Bitmap_1(unsigned width,
+                   unsigned height,
+                   Pixel const * background,
+                   unsigned top_line)
   : _lines(height),
     _words_per_line(width / 32),
     _top_line(top_line),
@@ -23,11 +29,13 @@ Bitmap_1::Bitmap_1(unsigned width, unsigned height, unsigned top_line)
     _flip_pended(false),
     _clut{ 0, 0xFF },
     _fb{ arena_new_array<uint32_t>(_words_per_line * _lines),
-         arena_new_array<uint32_t>(_words_per_line * _lines) }
+         arena_new_array<uint32_t>(_words_per_line * _lines) },
+    _background{background}
 {}
 
 Bitmap_1::~Bitmap_1() {
   _fb[0] = _fb[1] = nullptr;
+  _background = nullptr;
 }
 
 __attribute__((section(".ramcode")))
@@ -41,7 +49,12 @@ Rasterizer::LineShape Bitmap_1::rasterize(unsigned line_number, Pixel *target) {
 
   uint32_t const *src = _fb[_page1] + _words_per_line * line_number;
 
-  unpack_1bpp_impl(src, _clut, target, _words_per_line);
+  if (_background) {
+    auto bg = _background + (_words_per_line * 32) * line_number;
+    unpack_1bpp_overlay_impl(src, _clut, target, _words_per_line, bg);
+  } else {
+    unpack_1bpp_impl(src, _clut, target, _words_per_line);
+  }
 
   return { 0, _words_per_line * 32 };
 }

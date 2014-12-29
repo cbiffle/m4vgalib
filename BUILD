@@ -19,6 +19,7 @@ c_library('vga',
     'rast/text_10x16.cc',
 
     'rast/unpack_1bpp.S',
+    'rast/unpack_1bpp_overlay.S',
     'rast/unpack_direct_x2.S',
     'rast/unpack_direct_x2_rev.S',
     'rast/unpack_direct_x4.S',

@@ -11,6 +11,12 @@ void unpack_1bpp_impl(std::uint32_t const *input_line,
                       std::uint8_t *render_target,
                       unsigned words_in_input);
 
+void unpack_1bpp_overlay_impl(std::uint32_t const *input_line,
+                              std::uint8_t const *clut,
+                              std::uint8_t *render_target,
+                              unsigned words_in_input,
+                              std::uint8_t const * background);
+
 }  // namespace rast
 }  // namespace vga
 

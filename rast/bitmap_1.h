@@ -13,7 +13,19 @@ namespace rast {
 
 class Bitmap_1 : public Rasterizer {
 public:
+  /*
+   * Creates a 1bpp bitmap rasterizer with the given width, height, and
+   * optional offset.
+   */
   Bitmap_1(unsigned width, unsigned height, unsigned top_line = 0);
+
+  /*
+   * Creates a 1bpp bitmap rasterizer with the given width, height, background
+   * image, and optional offset.
+   */
+  Bitmap_1(unsigned width, unsigned height, Pixel const * background,
+           unsigned top_line = 0);
+
   ~Bitmap_1();
 
   virtual LineShape rasterize(unsigned, Pixel *) override;
@@ -49,6 +61,7 @@ private:
   std::atomic<bool> _flip_pended;
   Pixel _clut[2];
   std::uint32_t *_fb[2];
+  Pixel const * _background;
 };
 
 }  // namespace rast

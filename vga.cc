@@ -5,6 +5,7 @@
 #include <cstddef>
 
 #include "etl/attribute_macros.h"
+#include "etl/prediction.h"
 #include "etl/armv7m/exceptions.h"
 #include "etl/armv7m/exception_table.h"
 #include "etl/armv7m/instructions.h"
@@ -134,6 +135,21 @@ void init() {
   rcc.enable_clock(AhbPeripheral::gpiob);  // Sync signals
   rcc.enable_clock(AhbPeripheral::gpioe);  // Video
   rcc.enable_clock(AhbPeripheral::dma2);
+
+  auto &st = dma2.stream1;
+
+  // DMA configuration
+
+  // Set addresses.  Note that we're using memory as the peripheral side.
+  // This DMA controller is a little odd.
+  st.write_par(reinterpret_cast<Word>(&vga::scan_buffer));
+  st.write_m0ar(0x40021015);  // High byte of GPIOE ODR (hack hack)
+
+  // Configure FIFO.
+  st.write_fcr(Dma::Stream::fcr_value_t()
+               .with_fth(Dma::Stream::fcr_value_t::fth_t::quarter)
+               .with_dmdis(true)
+               .with_feie(false));
 
   // Configure our interrupt priorities.  The scheme is:
   //  TIM4 (horizontal) gets highest priority.
@@ -347,11 +363,10 @@ void vga_hblank_interrupt()
  */
 
 RAM_CODE
-__attribute__((noinline))
 static void start_of_active_video() {
   // CC2 indicates start of active video (end of back porch).
   // This only matters in displayed states.
-  if (!is_displayed_state(vga::state)) return;
+  if (ETL_UNLIKELY(!is_displayed_state(vga::state))) return;
 
   // Clear stream 1 flags (lifcr is a write-1-to-clear register).
   dma2.write_lifcr(Dma::lifcr_value_t()
@@ -359,22 +374,6 @@ static void start_of_active_video() {
                    .with_cteif1(true)
                    .with_chtif1(true)
                    .with_ctcif1(true));
-
-  auto &st = dma2.stream1;
-
-  // Prepare to transfer pixels as words, plus the final black word.
-  st.write_ndtr(vga::working_buffer_shape.length / 4 + 1);
-
-  // Set addresses.  Note that we're using memory as the peripheral side.
-  // This DMA controller is a little odd.
-  st.write_par(reinterpret_cast<Word>(&vga::scan_buffer));
-  st.write_m0ar(0x40021015);  // High byte of GPIOE ODR (hack hack)
-
-  // Configure FIFO.
-  st.write_fcr(Dma::Stream::fcr_value_t()
-               .with_fth(Dma::Stream::fcr_value_t::fth_t::quarter)
-               .with_dmdis(true)
-               .with_feie(false));
 
   /*
    * Configure and enable the DMA stream.  The configuration used here
@@ -414,30 +413,30 @@ static void start_of_active_video() {
    * use of the bus matrix during scan-out.
    */
   typedef Dma::Stream::cr_value_t cr_t;
-  st.write_cr(Dma::Stream::cr_value_t()
-              // Originally chosen to play nice with TIM8.  Now, arbitrary.
-              .with_chsel(7)
-              .with_pl(cr_t::pl_t::very_high)
-              .with_dir(cr_t::dir_t::memory_to_memory)
-              // Input settings:
-              .with_pburst(Dma::Stream::BurstSize::single)
-              .with_psize(Dma::Stream::TransferSize::word)
-              .with_pinc(true)
-              // Output settings:
-              .with_mburst(Dma::Stream::BurstSize::single)
-              .with_msize(Dma::Stream::TransferSize::byte)
-              .with_minc(false)
-              // Look at all these options we don't use:
-              .with_dbm(false)
-              .with_pincos(false)
-              .with_circ(false)
-              .with_pfctrl(false)
-              .with_tcie(false)
-              .with_htie(false)
-              .with_teie(false)
-              .with_dmeie(false)
-              // Finally, enable.
-              .with_en(true));
+  dma2.stream1.write_cr(Dma::Stream::cr_value_t()
+      // Originally chosen to play nice with TIM8.  Now, arbitrary.
+      .with_chsel(7)
+      .with_pl(cr_t::pl_t::very_high)
+      .with_dir(cr_t::dir_t::memory_to_memory)
+      // Input settings:
+      .with_pburst(Dma::Stream::BurstSize::single)
+      .with_psize(Dma::Stream::TransferSize::word)
+      .with_pinc(true)
+      // Output settings:
+      .with_mburst(Dma::Stream::BurstSize::single)
+      .with_msize(Dma::Stream::TransferSize::byte)
+      .with_minc(false)
+      // Look at all these options we don't use:
+      .with_dbm(false)
+      .with_pincos(false)
+      .with_circ(false)
+      .with_pfctrl(false)
+      .with_tcie(false)
+      .with_htie(false)
+      .with_teie(false)
+      .with_dmeie(false)
+      // Finally, enable.
+      .with_en(true));
 }
 
 RAM_CODE
@@ -501,7 +500,7 @@ RAM_CODE void etl_stm32f4xx_tim4_handler() {
   // We have to clear our interrupt flags, or this will recur.
   auto sr = tim4.read_sr();
 
-  if (sr.get_cc2if()) {
+  if (ETL_LIKELY(sr.get_cc2if())) {
     tim4.write_sr(sr.with_cc2if(false));
     start_of_active_video();
     return;
@@ -531,7 +530,7 @@ static vga::Rasterizer *get_next_rasterizer() {
 
 RAM_CODE
 void etl_armv7m_pend_sv_handler() {
-  if (is_rendered_state(vga::state)) {
+  if (ETL_LIKELY(is_rendered_state(vga::state))) {
     // Flip working_buffer into scan_buffer.
     // We know its contents are ready because otherwise we wouldn't take a new
     // PendSV.
@@ -544,11 +543,12 @@ void etl_armv7m_pend_sv_handler() {
                reinterpret_cast<Word *>(
                    static_cast<void *>(vga::scan_buffer)),
                vga::working_buffer_shape.length / 4);
+    dma2.stream1.write_ndtr(vga::working_buffer_shape.length / 4 + 1);
   }
 
   vga_hblank_interrupt();
 
-  if (is_rendered_state(vga::state)) {
+  if (ETL_LIKELY(is_rendered_state(vga::state))) {
     vga::Timing const &timing = vga::current_timing;
     unsigned line = vga::current_line;
     if (line >= timing.video_start_line && line <= timing.video_end_line) {

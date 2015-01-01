@@ -47,7 +47,7 @@ Timing const timing_vesa_800x600_60hz = {
   1056,  // line_pixels
   128,   // sync_pixels
   88,    // back_porch_pixels
-  24,    // video_lead
+  16,    // video_lead
   800,   // video_pixels,
   Timing::Polarity::positive,
 

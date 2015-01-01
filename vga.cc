@@ -13,15 +13,15 @@
 
 #include "etl/stm32f4xx/rcc.h"
 
-#include "etl/stm32f4xx/adv_timer.h"
 #include "etl/stm32f4xx/ahb.h"
 #include "etl/stm32f4xx/apb.h"
 #include "etl/stm32f4xx/dbg.h"
 #include "etl/stm32f4xx/dma.h"
 #include "etl/stm32f4xx/flash.h"
 #include "etl/stm32f4xx/gpio.h"
-#include "etl/stm32f4xx/interrupt_table.h"
+#include "etl/stm32f4xx/gp_timer.h"
 #include "etl/stm32f4xx/interrupts.h"
+#include "etl/stm32f4xx/interrupt_table.h"
 #include "etl/stm32f4xx/syscfg.h"
 
 #include "vga/arena.h"
@@ -35,7 +35,7 @@ using etl::armv7m::Scb;
 using etl::armv7m::scb;
 using etl::armv7m::Word;
 
-using etl::stm32f4xx::AdvTimer;
+using etl::stm32f4xx::GpTimer;
 using etl::stm32f4xx::AhbPeripheral;
 using etl::stm32f4xx::ApbPeripheral;
 using etl::stm32f4xx::Dbg;
@@ -44,13 +44,13 @@ using etl::stm32f4xx::Dma;
 using etl::stm32f4xx::dma2;
 using etl::stm32f4xx::flash;
 using etl::stm32f4xx::Gpio;
-using etl::stm32f4xx::gpioc;
+using etl::stm32f4xx::gpiob;
 using etl::stm32f4xx::gpioe;
 using etl::stm32f4xx::Interrupt;
 using etl::stm32f4xx::rcc;
 using etl::stm32f4xx::syscfg;
-using etl::stm32f4xx::tim1;
-using etl::stm32f4xx::tim8;
+using etl::stm32f4xx::tim3;
+using etl::stm32f4xx::tim4;
 
 #define IN_SCAN_RAM ETL_SECTION(".vga_scan_ram")
 #define IN_LOCAL_RAM ETL_SECTION(".vga_local_ram")
@@ -131,19 +131,19 @@ void init() {
   syscfg.write_cmpcr(syscfg.read_cmpcr().with_cmp_pd(true));
 
   // Turn a bunch of stuff on.
-  rcc.enable_clock(AhbPeripheral::gpioc);  // Sync signals
+  rcc.enable_clock(AhbPeripheral::gpiob);  // Sync signals
   rcc.enable_clock(AhbPeripheral::gpioe);  // Video
   rcc.enable_clock(AhbPeripheral::dma2);
 
   // Configure our interrupt priorities.  The scheme is:
-  //  TIM8 (horizontal) gets highest priority.
-  //  TIM1 (shock absorber) is set just lower.
+  //  TIM4 (horizontal) gets highest priority.
+  //  TIM3 (shock absorber) is set just lower.
   //  PendSV (rendering, user code) is lowest.
   // We could fit other stuff into the gaps later.
   // Note that PendSV is set using ARMv7-M priorities (0-255) and the others are
   // set using narrower SoC priorities (0-15).  This is a bit ugly.
-  set_irq_priority(Interrupt::tim8_cc, 0);
-  set_irq_priority(Interrupt::tim1_cc, 1);
+  set_irq_priority(Interrupt::tim4, 0);
+  set_irq_priority(Interrupt::tim3, 1);
   scb.set_exception_priority(etl::armv7m::Exception::pend_sv, 0xFF);
 
   // Enable Flash cache and prefetching to try and reduce jitter.
@@ -162,8 +162,8 @@ void init() {
 }
 
 void sync_off() {
-  gpioc.set_mode((1 << 6) | (1 << 7), Gpio::Mode::input);
-  gpioc.set_pull((1 << 6) | (1 << 7), Gpio::Pull::down);
+  gpiob.set_mode((1 << 6) | (1 << 7), Gpio::Mode::input);
+  gpiob.set_pull((1 << 6) | (1 << 7), Gpio::Pull::down);
 }
 
 void video_off() {
@@ -172,16 +172,16 @@ void video_off() {
 }
 
 void sync_on() {
-  // Configure PC6 to produce hsync using TIM8_CH1
-  gpioc.set_alternate_function(Gpio::p6, 3);
-  gpioc.set_output_type(Gpio::p6, Gpio::OutputType::push_pull);
-  gpioc.set_output_speed(Gpio::p6, Gpio::OutputSpeed::fast_50mhz);
-  gpioc.set_mode(Gpio::p6, Gpio::Mode::alternate);
+  // Configure PB6 to produce hsync using TIM4_CH1
+  gpiob.set_alternate_function(Gpio::p6, 2);
+  gpiob.set_output_type(Gpio::p6, Gpio::OutputType::push_pull);
+  gpiob.set_output_speed(Gpio::p6, Gpio::OutputSpeed::fast_50mhz);
+  gpiob.set_mode(Gpio::p6, Gpio::Mode::alternate);
 
-  // Configure PC7 as GPIO output.
-  gpioc.set_output_type(Gpio::p7, Gpio::OutputType::push_pull);
-  gpioc.set_output_speed(Gpio::p7, Gpio::OutputSpeed::fast_50mhz);
-  gpioc.set_mode(Gpio::p7, Gpio::Mode::gpio);
+  // Configure PB7 as GPIO output.
+  gpiob.set_output_type(Gpio::p7, Gpio::OutputType::push_pull);
+  gpiob.set_output_speed(Gpio::p7, Gpio::OutputSpeed::fast_50mhz);
+  gpiob.set_mode(Gpio::p7, Gpio::Mode::gpio);
 }
 
 void video_on() {
@@ -198,10 +198,10 @@ void video_on() {
  */
 static void configure_h_timer(Timing const &timing,
                               ApbPeripheral p,
-                              AdvTimer &tim) {
+                              GpTimer &tim) {
   rcc.enable_clock(p);
   rcc.leave_reset(p);
-  tim.write_psc(4 - 1);  // Count in pixels, 1 pixel = 4 CCLK
+  tim.write_psc(2 - 1);  // Count in pixels, 1 pixel = 2 PCLK = 4 CCLK
 
   tim.write_arr(timing.line_pixels - 1);
   tim.write_ccr1(timing.sync_pixels);
@@ -210,15 +210,11 @@ static void configure_h_timer(Timing const &timing,
   tim.write_ccr3(timing.sync_pixels
                  + timing.back_porch_pixels + timing.video_pixels);
 
-  tim.write_ccmr1(AdvTimer::ccmr1_value_t()
-                  .with_oc1m(AdvTimer::OcMode::pwm1)
-                  .with_cc1s(AdvTimer::ccmr1_value_t::cc1s_t::output));
+  tim.write_ccmr1(GpTimer::ccmr1_value_t()
+                  .with_oc1m(GpTimer::OcMode::pwm1)
+                  .with_cc1s(GpTimer::ccmr1_value_t::cc1s_t::output));
 
-  tim.write_bdtr(AdvTimer::bdtr_value_t()
-                 .with_ossr(true)
-                 .with_moe(true));
-
-  tim.write_ccer(AdvTimer::ccer_value_t()
+  tim.write_ccer(GpTimer::ccer_value_t()
                  .with_cc1e(true)
                  .with_cc1p(
                      timing.hsync_polarity == Timing::Polarity::negative));
@@ -244,8 +240,8 @@ void configure_timing(Timing const &timing) {
   video_off();
 
   // Place the horizontal timers in reset, disabling interrupts.
-  disable_h_timer(ApbPeripheral::tim8, Interrupt::tim8_cc);
-  disable_h_timer(ApbPeripheral::tim1, Interrupt::tim1_cc);
+  disable_h_timer(ApbPeripheral::tim4, Interrupt::tim4);
+  disable_h_timer(ApbPeripheral::tim3, Interrupt::tim3);
 
   // Busy-wait for pending DMA to complete.
   while (dma2.stream1.read_cr().get_en());
@@ -253,37 +249,37 @@ void configure_timing(Timing const &timing) {
   // Switch to new CPU clock settings.
   rcc.configure_clocks(timing.clock_config);
 
-  // Configure TIM1/8 for horizontal sync generation.
-  configure_h_timer(timing, ApbPeripheral::tim1, tim1);
-  configure_h_timer(timing, ApbPeripheral::tim8, tim8);
+  // Configure TIM3/4 for horizontal sync generation.
+  configure_h_timer(timing, ApbPeripheral::tim3, tim3);
+  configure_h_timer(timing, ApbPeripheral::tim4, tim4);
 
-  // Adjust tim1's CC2 value back in time.
-  tim1.write_ccr2(static_cast<Word>(tim1.read_ccr2()) - 7);
+  // Adjust tim3's CC2 value back in time.
+  tim3.write_ccr2(static_cast<Word>(tim3.read_ccr2()) - 7);
 
-  // Configure tim1 to distribute its enable signal as its trigger output.
-  tim1.write_cr2(AdvTimer::cr2_value_t()
-                 .with_mms(AdvTimer::cr2_value_t::mms_t::enable)
+  // Configure tim3 to distribute its enable signal as its trigger output.
+  tim3.write_cr2(GpTimer::cr2_value_t()
+                 .with_mms(GpTimer::cr2_value_t::mms_t::enable)
                  .with_ccds(false));
 
-  // Configure tim8 to trigger from tim1 and run forever.
-  tim8.write_smcr(AdvTimer::smcr_value_t()
-                  .with_ts(AdvTimer::smcr_value_t::ts_t::itr0)
-                  .with_sms(AdvTimer::smcr_value_t::sms_t::trigger));
+  // Configure tim4 to trigger from tim3 and run forever.
+  tim4.write_smcr(GpTimer::smcr_value_t()
+                  .with_ts(GpTimer::smcr_value_t::ts_t::itr2)
+                  .with_sms(GpTimer::smcr_value_t::sms_t::trigger));
 
-  // Turn on tim8's interrupts.
-  tim8.write_dier(AdvTimer::dier_value_t()
+  // Turn on tim4's interrupts.
+  tim4.write_dier(GpTimer::dier_value_t()
                   .with_cc2ie(true)    // Interrupt at start of active video.
                   .with_cc3ie(true));  // Interrupt at end of active video.
 
-  // Turn on only one of tim1's
-  tim1.write_dier(AdvTimer::dier_value_t()
+  // Turn on only one of tim3's
+  tim3.write_dier(GpTimer::dier_value_t()
                   .with_cc2ie(true));  // Interrupt at start of active video.
 
   // Note: timers still not running.
 
   switch (timing.vsync_polarity) {
-    case Timing::Polarity::positive: gpioc.clear(1 << 7); break;
-    case Timing::Polarity::negative: gpioc.set  (1 << 7); break;
+    case Timing::Polarity::positive: gpiob.clear(1 << 7); break;
+    case Timing::Polarity::negative: gpiob.set  (1 << 7); break;
   }
 
   // Scribble over working buffer to help catch bugs.
@@ -303,14 +299,14 @@ void configure_timing(Timing const &timing) {
   current_timing = timing;
 
   // Halt both timers on debug.
-  dbg.write_dbgmcu_apb2_fz(dbg.read_dbgmcu_apb2_fz()
-                           .with_dbg_tim8_stop(true)
-                           .with_dbg_tim1_stop(true));
+  dbg.write_dbgmcu_apb1_fz(dbg.read_dbgmcu_apb1_fz()
+                           .with_dbg_tim4_stop(true)
+                           .with_dbg_tim3_stop(true));
 
-  // Start TIM1, which starts TIM8.
-  enable_irq(Interrupt::tim1_cc);
-  enable_irq(Interrupt::tim8_cc);
-  tim1.write_cr1(tim1.read_cr1().with_cen(true));
+  // Start TIM3, which starts TIM4.
+  enable_irq(Interrupt::tim3);
+  enable_irq(Interrupt::tim4);
+  tim3.write_cr1(tim3.read_cr1().with_cen(true));
 
   sync_on();
 }
@@ -449,7 +445,7 @@ static void end_of_active_video() {
   vga::Timing const &timing = vga::current_timing;
 
   // Apply timing changes requested by the last rasterizer.
-  tim8.write_ccr2(timing.sync_pixels
+  tim4.write_ccr2(timing.sync_pixels
                   + timing.back_porch_pixels - timing.video_lead
                   + vga::working_buffer_shape.offset);
 
@@ -465,7 +461,7 @@ static void end_of_active_video() {
   } else if (line == timing.vsync_start_line
           || line == timing.vsync_end_line) {
     // Either edge of vsync pulse.
-    gpioc.toggle(Gpio::p7);
+    gpiob.toggle(Gpio::p7);
   } else if (line ==
                   static_cast<unsigned short>(timing.video_start_line - 1)) {
     // Time to start generating the first scan buffer.
@@ -489,10 +485,10 @@ static void end_of_active_video() {
 
 }
 
-RAM_CODE void etl_stm32f4xx_tim1_cc_handler() {
+RAM_CODE void etl_stm32f4xx_tim3_handler() {
   // We access this APB2 timer through the bridge on AHB1.  This implies
   // both wait states and resource conflicts with scanout.  Get done fast.
-  tim1.write_sr(tim1.read_sr().with_cc2if(false));
+  tim3.write_sr(tim3.read_sr().with_cc2if(false));
 
   // Idle the processor until preempted by any higher-priority interrupt.
   // This ensures that the M4's D-code bus is available for exception entry.
@@ -501,18 +497,18 @@ RAM_CODE void etl_stm32f4xx_tim1_cc_handler() {
   etl::armv7m::wait_for_interrupt();
 }
 
-RAM_CODE void etl_stm32f4xx_tim8_cc_handler() {
+RAM_CODE void etl_stm32f4xx_tim4_handler() {
   // We have to clear our interrupt flags, or this will recur.
-  auto sr = tim8.read_sr();
+  auto sr = tim4.read_sr();
 
   if (sr.get_cc2if()) {
-    tim8.write_sr(sr.with_cc2if(false));
+    tim4.write_sr(sr.with_cc2if(false));
     start_of_active_video();
     return;
   }
 
   if (sr.get_cc3if()) {
-    tim8.write_sr(sr.with_cc3if(false));
+    tim4.write_sr(sr.with_cc3if(false));
     end_of_active_video();
     return;
   }

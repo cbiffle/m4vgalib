@@ -16,14 +16,14 @@ __attribute__((section(".ramcode")))
 Rasterizer::RasterInfo Direct_2_Mirror::rasterize(unsigned line_number, Pixel *target) {
   line_number -= _top_line;
   line_number /= 2;
-  if (line_number >= get_height()) return { 0, 0, 0 };
+  if (line_number >= get_height()) return { 0, 0, 0, 0 };
   line_number = get_height() - line_number;
 
   unsigned char const *src = get_fg_buffer() + get_width() * line_number;
 
   unpack_direct_x2_rev_impl(src, target, get_width());
 
-  return { 0, get_width() * 2, 0 };
+  return { 0, get_width() * 2, 0, 0 };
 }
 
 }  // namespace rast

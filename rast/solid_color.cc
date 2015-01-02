@@ -21,7 +21,7 @@ Rasterizer::RasterInfo SolidColor::rasterize(unsigned, Pixel *target) {
     target32[i] = color32;
   }
 
-  return { 0, words * 4, 0 };
+  return { 0, words * 4, 0, 0 };
 }
 
 void SolidColor::set_color(Pixel c) {

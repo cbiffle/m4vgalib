@@ -44,7 +44,7 @@ Rasterizer::RasterInfo Bitmap_1::rasterize(unsigned line_number, Pixel *target) 
   if (ETL_UNLIKELY(line_number == 0)) {
     if (_flip_pended.exchange(false)) flip_now();
   } else if (ETL_UNLIKELY(line_number >= _lines)) {
-    return { 0, 0, 0 };
+    return { 0, 0, 0, 0 };
   }
 
   uint32_t const *src = _fb[_page1] + _words_per_line * line_number;
@@ -56,7 +56,7 @@ Rasterizer::RasterInfo Bitmap_1::rasterize(unsigned line_number, Pixel *target) 
     unpack_1bpp_impl(src, _clut, target, _words_per_line);
   }
 
-  return { 0, _words_per_line * 32, 0 };
+  return { 0, _words_per_line * 32, 0, 0 };
 }
 
 Bitmap Bitmap_1::get_bg_bitmap() const {

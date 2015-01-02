@@ -34,6 +34,9 @@ public:
     // 4 CPU cycles.  This can be used to add more -- for example, adding 4 here
     // halves the horizontal resolution.
     unsigned stretch_cycles;
+
+    // How many times to repeat this line of raster output, after the first.
+    unsigned repeat_lines;
   };
 
   /*

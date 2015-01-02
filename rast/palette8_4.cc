@@ -42,13 +42,13 @@ Rasterizer::RasterInfo Palette8_4::rasterize(unsigned line_number, Pixel *target
     if (_flip_pended.exchange(false)) flip_now();
   }
 
-  if (ETL_UNLIKELY(line_number >= _height)) return { 0, 0, 0 };
+  if (ETL_UNLIKELY(line_number >= _height)) return { 0, 0, 0, 0 };
 
   unsigned char const *src = _fb[_page1] + _width * line_number;
 
   unpack_p256_impl(src, target, _width, _palette);
 
-  return { 0, _width, 12 };
+  return { 0, _width, 12, 0 };
 }
 
 void Palette8_4::pend_flip() {

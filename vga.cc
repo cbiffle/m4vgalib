@@ -481,18 +481,23 @@ RAM_CODE void etl_stm32f4xx_tim4_handler() {
 }
 
 RAM_CODE
-static vga::Rasterizer *get_next_rasterizer() {
+static bool advance_rasterizer_band() {
   if (vga::current_band.line_count) {
     --vga::current_band.line_count;
-    return vga::current_band.rasterizer;
+    return false;
   } else {
     if (vga::current_band.next) {
       vga::current_band = *vga::current_band.next;
-      return get_next_rasterizer();
+      return true;
     } else {
-      return nullptr;
+      return false;
     }
   }
+}
+
+RAM_CODE
+static vga::Rasterizer *get_rasterizer() {
+  return vga::current_band.rasterizer;
 }
 
 RAM_CODE
@@ -553,10 +558,16 @@ void etl_armv7m_pend_sv_handler() {
     unsigned line = vga::current_line;
     if (line >= timing.video_start_line && line <= timing.video_end_line) {
       unsigned visible_line = line - timing.video_start_line;
-      vga::Rasterizer *r = get_next_rasterizer();
-      if (r) {
-        vga::working_buffer_shape = r->rasterize(visible_line,
-                                                 vga::working.buffer);
+
+      bool band_edge = advance_rasterizer_band();
+      if (vga::working_buffer_shape.repeat_lines == 0 || band_edge) {
+        vga::Rasterizer *r = get_rasterizer();
+        if (r) {
+          vga::working_buffer_shape = r->rasterize(visible_line,
+                                                   vga::working.buffer);
+        }
+      } else {  // repeat_lines > 0, not band_edge
+        --vga::working_buffer_shape.repeat_lines;
       }
     }
   }

@@ -5,7 +5,7 @@
 #include "vga/arena.h"
 #include "vga/copy_words.h"
 #include "vga/vga.h"
-#include "vga/rast/unpack_p256_x4.h"
+#include "vga/rast/unpack_p256.h"
 
 namespace vga {
 namespace rast {
@@ -46,9 +46,9 @@ Rasterizer::RasterInfo Palette8_4::rasterize(unsigned line_number, Pixel *target
 
   unsigned char const *src = _fb[_page1] + _width * line_number;
 
-  unpack_p256_x4_impl(src, target, _width, _palette);
+  unpack_p256_impl(src, target, _width, _palette);
 
-  return { 0, _width * 4, 0 };
+  return { 0, _width, 12 };
 }
 
 void Palette8_4::pend_flip() {

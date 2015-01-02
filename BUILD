@@ -24,7 +24,7 @@ c_library('vga',
     'rast/unpack_direct_x2_rev.S',
     'rast/unpack_direct_x4.S',
     'rast/unpack_direct_x4_rev.S',
-    'rast/unpack_p256_x4.S',
+    'rast/unpack_p256.S',
     'rast/unpack_text_10p_attributed.S',
   ],
   local = {

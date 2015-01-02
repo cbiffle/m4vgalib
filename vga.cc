@@ -126,6 +126,7 @@ static constexpr auto dma_xfer_common = Dma::Stream::cr_value_t()
   .with_pburst(Dma::Stream::BurstSize::single)
   .with_mburst(Dma::Stream::BurstSize::single)
   .with_en(true);
+static bool scan_buffer_needs_update;
 
 static Band const *band_list_head;
 static Band current_band;
@@ -503,18 +504,22 @@ static vga::Rasterizer *get_rasterizer() {
 RAM_CODE
 void etl_armv7m_pend_sv_handler() {
   if (ETL_LIKELY(is_rendered_state(vga::state))) {
-    // Flip working_buffer into scan_buffer.
-    // We know its contents are ready because otherwise we wouldn't take a new
-    // PendSV.
-    // Note that GCC can't see that we've aligned the buffers correctly, so we
-    // have to do a multi-cast dance. :-/
-    ((Word *) (void *) vga::scan_buffer)[
-        vga::working_buffer_shape.length / 4] = 0;
-    copy_words(reinterpret_cast<Word const *>(
-                   static_cast<void *>(vga::working.buffer)),
-               reinterpret_cast<Word *>(
-                   static_cast<void *>(vga::scan_buffer)),
-               vga::working_buffer_shape.length / 4);
+    if (vga::scan_buffer_needs_update) {
+      // Flip working_buffer into scan_buffer.
+      // We know its contents are ready because otherwise we wouldn't take a new
+      // PendSV.
+      // Note that GCC can't see that we've aligned the buffers correctly, so we
+      // have to do a multi-cast dance. :-/
+      ((Word *) (void *) vga::scan_buffer)[
+          vga::working_buffer_shape.length / 4] = 0;
+      copy_words(
+          reinterpret_cast<Word const *>(
+            static_cast<void *>(vga::working.buffer)),
+          reinterpret_cast<Word *>(
+            static_cast<void *>(vga::scan_buffer)),
+          vga::working_buffer_shape.length / 4);
+      vga::scan_buffer_needs_update = false;
+    }
 
     auto & st = dma2.stream5;
     if (vga::working_buffer_shape.stretch_cycles) {
@@ -565,6 +570,7 @@ void etl_armv7m_pend_sv_handler() {
         if (r) {
           vga::working_buffer_shape = r->rasterize(visible_line,
                                                    vga::working.buffer);
+          vga::scan_buffer_needs_update = true;
         }
       } else {  // repeat_lines > 0, not band_edge
         --vga::working_buffer_shape.repeat_lines;

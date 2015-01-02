@@ -36,6 +36,7 @@ Palette8_4::~Palette8_4() {
 __attribute__((section(".ramcode")))
 Rasterizer::RasterInfo Palette8_4::rasterize(unsigned line_number, Pixel *target) {
   line_number -= _top_line;
+  auto repeat = 3 - (line_number % 4);
   line_number /= 4;
 
   if (ETL_UNLIKELY(line_number == 0)) {
@@ -48,7 +49,7 @@ Rasterizer::RasterInfo Palette8_4::rasterize(unsigned line_number, Pixel *target
 
   unpack_p256_impl(src, target, _width, _palette);
 
-  return { 0, _width, 12, 0 };
+  return { 0, _width, 12, repeat };
 }
 
 void Palette8_4::pend_flip() {

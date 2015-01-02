@@ -13,6 +13,7 @@
 #include "etl/armv7m/scb.h"
 #include "etl/armv7m/types.h"
 
+#include "etl/stm32f4xx/adv_timer.h"
 #include "etl/stm32f4xx/ahb.h"
 #include "etl/stm32f4xx/apb.h"
 #include "etl/stm32f4xx/dbg.h"
@@ -36,6 +37,7 @@ using etl::armv7m::scb;
 using etl::armv7m::Scb;
 using etl::armv7m::Word;
 
+using etl::stm32f4xx::AdvTimer;
 using etl::stm32f4xx::AhbPeripheral;
 using etl::stm32f4xx::ApbPeripheral;
 using etl::stm32f4xx::dbg;
@@ -50,6 +52,7 @@ using etl::stm32f4xx::GpTimer;
 using etl::stm32f4xx::Interrupt;
 using etl::stm32f4xx::rcc;
 using etl::stm32f4xx::syscfg;
+using etl::stm32f4xx::tim1;
 using etl::stm32f4xx::tim3;
 using etl::stm32f4xx::tim4;
 
@@ -115,7 +118,14 @@ static struct {
   Pixel right_pad[16];
 } working;
 
-static Rasterizer::LineShape working_buffer_shape;
+static Rasterizer::RasterInfo working_buffer_shape;
+static Dma::Stream::cr_value_t next_dma_xfer;
+static constexpr auto dma_xfer_common = Dma::Stream::cr_value_t()
+  .with_chsel(6)  // for TIM1_UP
+  .with_pl(Dma::Stream::cr_value_t::pl_t::very_high)
+  .with_pburst(Dma::Stream::BurstSize::single)
+  .with_mburst(Dma::Stream::BurstSize::single)
+  .with_en(true);
 
 static Band const *band_list_head;
 static Band current_band;
@@ -136,20 +146,26 @@ void init() {
   rcc.enable_clock(AhbPeripheral::gpioe);  // Video
   rcc.enable_clock(AhbPeripheral::dma2);
 
-  auto &st = dma2.stream1;
+  auto &st = dma2.stream5;
 
   // DMA configuration
-
-  // Set addresses.  Note that we're using memory as the peripheral side.
-  // This DMA controller is a little odd.
-  st.write_par(reinterpret_cast<Word>(&vga::scan_buffer));
-  st.write_m0ar(0x40021015);  // High byte of GPIOE ODR (hack hack)
 
   // Configure FIFO.
   st.write_fcr(Dma::Stream::fcr_value_t()
                .with_fth(Dma::Stream::fcr_value_t::fth_t::quarter)
                .with_dmdis(true)
                .with_feie(false));
+
+  // Configure the pixel-generation timer used during half-horizontal mode.
+  // We use TIM1; it's an APB2 (fast) peripheral, and with our clock config
+  // it gets clocked at the full CPU rate.  We'll load ARR under rasterizer
+  // control to synthesize 1/n rates.
+  rcc.enable_clock(ApbPeripheral::tim1);
+  tim1.write_psc(1 - 1);  // Divide input clock by 1.
+  tim1.write_cr1(AdvTimer::cr1_value_t()
+      .with_urs(true));
+  tim1.write_dier(AdvTimer::dier_value_t()
+      .with_ude(true));  // DRQ on update
 
   // Configure our interrupt priorities.  The scheme is:
   //  TIM4 (horizontal) gets highest priority.
@@ -161,6 +177,14 @@ void init() {
   set_irq_priority(Interrupt::tim4, 0);
   set_irq_priority(Interrupt::tim3, 1);
   scb.set_exception_priority(etl::armv7m::Exception::pend_sv, 0xFF);
+
+  // Halt all our timers on debug.
+  dbg.write_dbgmcu_apb1_fz(dbg.read_dbgmcu_apb1_fz()
+                           .with_dbg_tim4_stop(true)
+                           .with_dbg_tim3_stop(true));
+
+  dbg.write_dbgmcu_apb2_fz(dbg.read_dbgmcu_apb2_fz()
+                           .with_dbg_tim1_stop(true));
 
   // Enable Flash cache and prefetching to try and reduce jitter.
   // This only affects best-effort-level code, not anything realtime.
@@ -260,7 +284,7 @@ void configure_timing(Timing const &timing) {
   disable_h_timer(ApbPeripheral::tim3, Interrupt::tim3);
 
   // Busy-wait for pending DMA to complete.
-  while (dma2.stream1.read_cr().get_en());
+  while (dma2.stream5.read_cr().get_en());
 
   // Switch to new CPU clock settings.
   rcc.configure_clocks(timing.clock_config);
@@ -314,11 +338,6 @@ void configure_timing(Timing const &timing) {
   current_line = 0;
   current_timing = timing;
 
-  // Halt both timers on debug.
-  dbg.write_dbgmcu_apb1_fz(dbg.read_dbgmcu_apb1_fz()
-                           .with_dbg_tim4_stop(true)
-                           .with_dbg_tim3_stop(true));
-
   // Start TIM3, which starts TIM4.
   enable_irq(Interrupt::tim3);
   enable_irq(Interrupt::tim4);
@@ -368,79 +387,27 @@ static void start_of_active_video() {
   // This only matters in displayed states.
   if (ETL_UNLIKELY(!is_displayed_state(vga::state))) return;
 
-  // Clear stream 1 flags (lifcr is a write-1-to-clear register).
-  dma2.write_lifcr(Dma::lifcr_value_t()
-                   .with_cdmeif1(true)
-                   .with_cteif1(true)
-                   .with_chtif1(true)
-                   .with_ctcif1(true));
+  // Clear stream 5 flags (hifcr is a write-1-to-clear register).
+  dma2.write_hifcr(Dma::hifcr_value_t()
+                   .with_cdmeif5(true)
+                   .with_cteif5(true)
+                   .with_chtif5(true)
+                   .with_ctcif5(true));
 
-  /*
-   * Configure and enable the DMA stream.  The configuration used here
-   * deserves more discussion.
-   *
-   * As noted above, our "peripheral" is RAM and our "memory" is the GPIO
-   * unit.  In memory-to-memory mode (which we use) the distinction is
-   * not useful, since the peripherals are memory-mapped; the controller
-   * insists that "peripheral" be source and "memory" be destination in that
-   * mode.  The key here is that the transfer runs at full speed.  On the
-   * STM32F407 the transfer will not exceed one unit per 4 AHB cycles.  The
-   * reason for this is not obvious.
-   *
-   * Address incrementation on this chip is independent from whether an
-   * address is considered "peripheral" or "memory."  Here we auto-increment
-   * the peripheral address (to walk through the scan buffer) while leaving
-   * the memory address fixed (at the appropriate byte of the GPIO port).
-   *
-   * Because we're using memory-to-memory, the hardware enforces several
-   * restrictions:
-   *
-   *  1. We're stuck using DMA2.  DMA1 can't do it.
-   *  2. We're required to use the FIFO -- direct mode is verboten.
-   *  3. We can't use circular mode.  (Double-buffer mode appears permitted,
-   *     but I haven't tried it.)
-   *
-   * Fortunately we can tie the FIFO to a tree by giving it a really low
-   * threshold level.
-   *
-   * I have not experimented with burst modes, but I suspect they'll make
-   * the timing less regular.
-   *
-   * Note that the priority (pl field) is only used for arbitration between
-   * streams of the same DMA controller.  The STM32F4 does not provide any
-   * control over the AHB matrix arbitration scheme, unlike (say) the NXP
-   * LPC1788.  Shame, that.  It means we have to be very careful about our
-   * use of the bus matrix during scan-out.
-   */
-  typedef Dma::Stream::cr_value_t cr_t;
-  dma2.stream1.write_cr(Dma::Stream::cr_value_t()
-      // Originally chosen to play nice with TIM8.  Now, arbitrary.
-      .with_chsel(7)
-      .with_pl(cr_t::pl_t::very_high)
-      .with_dir(cr_t::dir_t::memory_to_memory)
-      // Input settings:
-      .with_pburst(Dma::Stream::BurstSize::single)
-      .with_psize(Dma::Stream::TransferSize::word)
-      .with_pinc(true)
-      // Output settings:
-      .with_mburst(Dma::Stream::BurstSize::single)
-      .with_msize(Dma::Stream::TransferSize::byte)
-      .with_minc(false)
-      // Look at all these options we don't use:
-      .with_dbm(false)
-      .with_pincos(false)
-      .with_circ(false)
-      .with_pfctrl(false)
-      .with_tcie(false)
-      .with_htie(false)
-      .with_teie(false)
-      .with_dmeie(false)
-      // Finally, enable.
-      .with_en(true));
+  // Start the countdown for first DRQ.
+  tim1.write_cr1(AdvTimer::cr1_value_t()
+      .with_urs(true)
+      .with_cen(true));
+
+  dma2.stream5.write_cr(vga::next_dma_xfer);
 }
 
 RAM_CODE
 static void end_of_active_video() {
+  tim1.write_cr1(AdvTimer::cr1_value_t()
+      .with_urs(true)
+      .with_cen(false));
+
   vga::Timing const &timing = vga::current_timing;
 
   // Apply timing changes requested by the last rasterizer.
@@ -543,7 +510,40 @@ void etl_armv7m_pend_sv_handler() {
                reinterpret_cast<Word *>(
                    static_cast<void *>(vga::scan_buffer)),
                vga::working_buffer_shape.length / 4);
-    dma2.stream1.write_ndtr(vga::working_buffer_shape.length / 4 + 1);
+
+    auto & st = dma2.stream5;
+    if (vga::working_buffer_shape.stretch_cycles) {
+      // Adjust reload frequency of TIM1 to accomodate desired pixel clock.
+      tim1.write_arr(vga::working_buffer_shape.stretch_cycles + 4 - 1);
+      // Force an update to reset the timer state.
+      tim1.write_egr(AdvTimer::egr_value_t().with_ug(true));
+      // Nudge the count down to delay the first DRQ (fudge factor)
+      tim1.write_cnt(uint32_t(-4));
+
+      st.write_par(0x40021015);  // High byte of GPIOE ODR (hack hack)
+      st.write_m0ar(reinterpret_cast<Word>(&vga::scan_buffer));
+      st.write_ndtr(vga::working_buffer_shape.length + 4);
+
+      vga::next_dma_xfer = vga::dma_xfer_common
+          .with_dir(Dma::Stream::cr_value_t::dir_t::memory_to_peripheral)
+          .with_msize(Dma::Stream::TransferSize::word)
+          .with_minc(true)
+          .with_psize(Dma::Stream::TransferSize::byte)
+          .with_pinc(false);
+    } else {
+      st.write_ndtr(vga::working_buffer_shape.length / 4 + 1);
+      // Note that we're using memory as the peripheral side.
+      // This DMA controller is a little odd.
+      st.write_par(reinterpret_cast<Word>(&vga::scan_buffer));
+      st.write_m0ar(0x40021015);  // High byte of GPIOE ODR (hack hack)
+
+      vga::next_dma_xfer = vga::dma_xfer_common
+          .with_dir(Dma::Stream::cr_value_t::dir_t::memory_to_memory)
+          .with_psize(Dma::Stream::TransferSize::word)
+          .with_pinc(true)
+          .with_msize(Dma::Stream::TransferSize::byte)
+          .with_minc(false);
+    }
   }
 
   vga_hblank_interrupt();

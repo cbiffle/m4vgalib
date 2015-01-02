@@ -20,7 +20,7 @@ public:
   unsigned get_col_count() const { return _cols; }
   unsigned get_row_count() const { return _rows; }
 
-  virtual LineShape rasterize(unsigned, Pixel *) override;
+  virtual RasterInfo rasterize(unsigned, Pixel *) override;
 
   void clear_framebuffer(Pixel);
 

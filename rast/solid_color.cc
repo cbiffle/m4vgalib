@@ -11,7 +11,7 @@ SolidColor::SolidColor(unsigned width, Pixel color)
 
 
 __attribute__((section(".ramcode")))
-Rasterizer::LineShape SolidColor::rasterize(unsigned, Pixel *target) {
+Rasterizer::RasterInfo SolidColor::rasterize(unsigned, Pixel *target) {
   unsigned words = _width / 4;
   unsigned *target32 =
       reinterpret_cast<unsigned *>(static_cast<void *>(target));
@@ -21,7 +21,7 @@ Rasterizer::LineShape SolidColor::rasterize(unsigned, Pixel *target) {
     target32[i] = color32;
   }
 
-  return { 0, words * 4 };
+  return { 0, words * 4, 0 };
 }
 
 void SolidColor::set_color(Pixel c) {

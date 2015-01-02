@@ -18,10 +18,10 @@ public:
   typedef std::uint8_t Pixel;
 
   /*
-   * Implementations of rasterize return a LineShape.  This lets them render
-   * only a subsection of the scanline; the rest will be left black.
+   * Implementations of rasterize return RasterInfo describing how they
+   * expect their output to be displayed.
    */
-  struct LineShape {
+  struct RasterInfo {
     // Number of black pixels to left of line.  Negative offsets shift the
     // start of active video earlier than anticipated (closer to the hsync)
     // and may impinge on code running during hblank.
@@ -29,6 +29,11 @@ public:
 
     // Number of valid pixels generated in render target.
     unsigned length;
+
+    // Number of additional CPU cycles per pixel.  By default, each pixel takes
+    // 4 CPU cycles.  This can be used to add more -- for example, adding 4 here
+    // halves the horizontal resolution.
+    unsigned stretch_cycles;
   };
 
   /*
@@ -38,7 +43,7 @@ public:
    * The line_number is relative to the first displayed line in the current
    * mode, not necessarily the first line handled by this Rasterizer!
    */
-  virtual LineShape rasterize(unsigned line_number, Pixel *raster_target) = 0;
+  virtual RasterInfo rasterize(unsigned line_number, Pixel *raster_target) = 0;
 
 protected:
   ~Rasterizer() = default;

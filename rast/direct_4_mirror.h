@@ -15,7 +15,7 @@ class Direct_4_Mirror : public Rasterizer {
 public:
   Direct_4_Mirror(Direct_4 const & rast, unsigned top_line = 0);
 
-  virtual LineShape rasterize(unsigned, Pixel *) override;
+  virtual RasterInfo rasterize(unsigned, Pixel *) override;
 
   unsigned get_width() const { return _r.get_width(); }
   unsigned get_height() const { return _r.get_height(); }

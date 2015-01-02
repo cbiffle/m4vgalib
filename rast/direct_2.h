@@ -16,7 +16,7 @@ public:
   Direct_2(unsigned width, unsigned height, unsigned top_line = 0);
   ~Direct_2();
 
-  virtual LineShape rasterize(unsigned, Pixel *) override;
+  virtual RasterInfo rasterize(unsigned, Pixel *) override;
 
   void flip();
   void flip_now();

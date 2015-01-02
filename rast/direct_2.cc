@@ -26,16 +26,16 @@ Direct_2::~Direct_2() {
 }
 
 __attribute__((section(".ramcode")))
-Rasterizer::LineShape Direct_2::rasterize(unsigned line_number, Pixel *target) {
+Rasterizer::RasterInfo Direct_2::rasterize(unsigned line_number, Pixel *target) {
   line_number -= _top_line;
   line_number /= 2;
-  if (line_number >= _height) return { 0, 0 };
+  if (line_number >= _height) return { 0, 0, 0 };
 
   unsigned char const *src = _fb[_page1] + _width * line_number;
 
   unpack_direct_x2_impl(src, target, _width);
 
-  return { 0, _width * 2 };
+  return { 0, _width * 2, 0 };
 }
 
 void Direct_2::flip() {

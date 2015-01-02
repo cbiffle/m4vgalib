@@ -28,7 +28,7 @@ public:
 
   ~Bitmap_1();
 
-  virtual LineShape rasterize(unsigned, Pixel *) override;
+  virtual RasterInfo rasterize(unsigned, Pixel *) override;
 
   Bitmap get_bg_bitmap() const;
   Graphics1 make_bg_graphics() const;

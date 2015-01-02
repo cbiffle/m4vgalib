@@ -29,7 +29,7 @@ Direct_4::~Direct_4() {
 }
 
 __attribute__((section(".ramcode")))
-Rasterizer::LineShape Direct_4::rasterize(unsigned line_number, Pixel *target) {
+Rasterizer::RasterInfo Direct_4::rasterize(unsigned line_number, Pixel *target) {
   line_number -= _top_line;
   line_number /= 4;
 
@@ -37,13 +37,13 @@ Rasterizer::LineShape Direct_4::rasterize(unsigned line_number, Pixel *target) {
     if (_flip_pended.exchange(false)) flip_now();
   }
 
-  if (ETL_UNLIKELY(line_number >= _height)) return { 0, 0 };
+  if (ETL_UNLIKELY(line_number >= _height)) return { 0, 0, 0 };
 
   unsigned char const *src = _fb[_page1] + _width * line_number;
 
   unpack_direct_x4_impl(src, target, _width);
 
-  return { 0, _width * 4 };
+  return { 0, _width * 4, 0 };
 }
 
 void Direct_4::pend_flip() {

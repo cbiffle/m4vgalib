@@ -18,7 +18,7 @@ public:
   Palette8_4(unsigned width, unsigned height, unsigned top_line = 0);
   ~Palette8_4();
 
-  virtual LineShape rasterize(unsigned, Pixel *) override;
+  virtual RasterInfo rasterize(unsigned, Pixel *) override;
 
   void pend_flip();
   void flip_now();

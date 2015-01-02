@@ -1,18 +1,17 @@
 #include "vga/vga.h"
 
 #include <atomic>
-#include <cstdint>
 #include <cstddef>
+#include <cstdint>
 
 #include "etl/attribute_macros.h"
 #include "etl/prediction.h"
+
 #include "etl/armv7m/exceptions.h"
 #include "etl/armv7m/exception_table.h"
 #include "etl/armv7m/instructions.h"
 #include "etl/armv7m/scb.h"
 #include "etl/armv7m/types.h"
-
-#include "etl/stm32f4xx/rcc.h"
 
 #include "etl/stm32f4xx/ahb.h"
 #include "etl/stm32f4xx/apb.h"
@@ -23,30 +22,31 @@
 #include "etl/stm32f4xx/gp_timer.h"
 #include "etl/stm32f4xx/interrupts.h"
 #include "etl/stm32f4xx/interrupt_table.h"
+#include "etl/stm32f4xx/rcc.h"
 #include "etl/stm32f4xx/syscfg.h"
 
 #include "vga/arena.h"
 #include "vga/copy_words.h"
-#include "vga/timing.h"
 #include "vga/rasterizer.h"
+#include "vga/timing.h"
 
 using std::size_t;
 
-using etl::armv7m::Scb;
 using etl::armv7m::scb;
+using etl::armv7m::Scb;
 using etl::armv7m::Word;
 
-using etl::stm32f4xx::GpTimer;
 using etl::stm32f4xx::AhbPeripheral;
 using etl::stm32f4xx::ApbPeripheral;
-using etl::stm32f4xx::Dbg;
 using etl::stm32f4xx::dbg;
+using etl::stm32f4xx::Dbg;
 using etl::stm32f4xx::Dma;
 using etl::stm32f4xx::dma2;
 using etl::stm32f4xx::flash;
 using etl::stm32f4xx::Gpio;
 using etl::stm32f4xx::gpiob;
 using etl::stm32f4xx::gpioe;
+using etl::stm32f4xx::GpTimer;
 using etl::stm32f4xx::Interrupt;
 using etl::stm32f4xx::rcc;
 using etl::stm32f4xx::syscfg;

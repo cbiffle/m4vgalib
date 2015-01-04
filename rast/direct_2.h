@@ -18,7 +18,6 @@ public:
 
   virtual RasterInfo rasterize(unsigned, Pixel *) override;
 
-  void flip();
   void flip_now();
 
   unsigned get_width() const { return _width; }

@@ -12,6 +12,7 @@ namespace vga {
  */
 class Graphics1 {
 public:
+  Graphics1() = default;
   Graphics1(Bitmap);
 
   /*

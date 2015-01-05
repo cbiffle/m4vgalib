@@ -15,12 +15,11 @@ namespace rast {
  */
 class Palette8_4 : public Rasterizer {
 public:
-  Palette8_4(unsigned width, unsigned height, unsigned top_line = 0);
+  Palette8_4(unsigned width, unsigned height, bool lerp, unsigned top_line = 0);
   ~Palette8_4();
 
   virtual RasterInfo rasterize(unsigned, Pixel *) override;
 
-  void pend_flip();
   void flip_now();
 
   unsigned get_width() const { return _width; }
@@ -34,8 +33,8 @@ private:
   unsigned _width;
   unsigned _height;
   unsigned _top_line;
+  bool _lerp;
   bool _page1;
-  std::atomic<bool> _flip_pended;
   unsigned char *_fb[2];
   Pixel * _palette;
 };

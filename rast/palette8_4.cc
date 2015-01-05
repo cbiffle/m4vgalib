@@ -6,16 +6,18 @@
 #include "vga/copy_words.h"
 #include "vga/vga.h"
 #include "vga/rast/unpack_p256.h"
+#include "vga/rast/unpack_p256_lerp4.h"
 
 namespace vga {
 namespace rast {
 
-Palette8_4::Palette8_4(unsigned width, unsigned height, unsigned top_line)
+Palette8_4::Palette8_4(unsigned width, unsigned height,
+                       bool lerp, unsigned top_line)
   : _width(width),
     _height(height),
     _top_line(top_line),
+    _lerp(lerp),
     _page1(false),
-    _flip_pended(false),
     _fb{arena_new_array<unsigned char>(_width * _height),
         arena_new_array<unsigned char>(_width * _height)},
     _palette{arena_new_array<Pixel>(256)} {
@@ -39,21 +41,17 @@ Rasterizer::RasterInfo Palette8_4::rasterize(unsigned line_number, Pixel *target
   auto repeat = 3 - (line_number % 4);
   line_number /= 4;
 
-  if (ETL_UNLIKELY(line_number == 0)) {
-    if (_flip_pended.exchange(false)) flip_now();
-  }
-
   if (ETL_UNLIKELY(line_number >= _height)) return { 0, 0, 0, 0 };
 
   unsigned char const *src = _fb[_page1] + _width * line_number;
 
-  unpack_p256_impl(src, target, _width, _palette);
-
-  return { 0, _width, 12, repeat };
-}
-
-void Palette8_4::pend_flip() {
-  _flip_pended = true;
+  if (_lerp) {
+    unpack_p256_lerp4_impl(src, target, _width, _palette);
+    return { 0, _width * 4 - 1, 0, repeat };
+  } else {
+    unpack_p256_impl(src, target, _width, _palette);
+    return { 0, _width, 12, repeat };
+  }
 }
 
 void Palette8_4::flip_now() {

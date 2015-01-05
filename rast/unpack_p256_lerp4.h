@@ -9,8 +9,7 @@ namespace rast {
 void unpack_p256_lerp4_impl(void const *input_line,
                             unsigned char *render_target,
                             unsigned bytes_in_input,
-                            std::uint8_t const * palette0,
-                            std::uint8_t const * palette1);
+                            std::uint8_t const * palette0);
 
 }  // namespace rast
 }  // namespace vga

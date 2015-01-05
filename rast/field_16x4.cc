@@ -5,7 +5,7 @@
 #include "vga/arena.h"
 #include "vga/copy_words.h"
 #include "vga/vga.h"
-#include "vga/rast/unpack_p256_lerp4.h"
+#include "vga/rast/unpack_p256_lerp4_d4.h"
 
 namespace vga {
 namespace rast {
@@ -53,8 +53,8 @@ auto Field16x4::rasterize(unsigned line_number, Pixel *target) -> RasterInfo {
 
   unsigned char const *src = _fb[_page1] + _width * line_number;
 
-  unpack_p256_lerp4_impl(src, target, _width,
-                         _palettes[odd_line], _palettes[!odd_line]);
+  unpack_p256_lerp4_d4_impl(src, target, _width,
+                            _palettes[odd_line], _palettes[!odd_line]);
 
   return { 0, _width * 16, 0, repeat };
 }

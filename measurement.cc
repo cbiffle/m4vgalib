@@ -9,6 +9,7 @@ using etl::armv7m::sys_tick;
 using etl::stm32f4xx::AhbPeripheral;
 using etl::stm32f4xx::Gpio;
 using etl::stm32f4xx::gpioc;
+using etl::stm32f4xx::gpioe;
 using etl::stm32f4xx::rcc;
 
 namespace vga {
@@ -19,6 +20,12 @@ void msigs_init() {
   gpioc.set_output_type(Gpio::p8 | Gpio::p9, Gpio::OutputType::push_pull);
   gpioc.set_output_speed(Gpio::p8 | Gpio::p9, Gpio::OutputSpeed::high_100mhz);
   gpioc.set_mode(Gpio::p8 | Gpio::p9, Gpio::Mode::gpio);
+
+  rcc.enable_clock(AhbPeripheral::gpioe);
+
+  gpioe.set_output_type(0xFF, Gpio::OutputType::push_pull);
+  gpioe.set_output_speed(0xFF, Gpio::OutputSpeed::high_100mhz);
+  gpioe.set_mode(0xFF, Gpio::Mode::gpio);
 }
 
 void mtim_init() {

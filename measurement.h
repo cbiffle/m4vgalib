@@ -33,6 +33,15 @@ ETL_INLINE void msig_b_toggle() {
   etl::stm32f4xx::gpioc.toggle(etl::stm32f4xx::Gpio::p8);
 }
 
+ETL_INLINE void msig_e_set(unsigned index) {
+  etl::stm32f4xx::gpioe.set((1 << index) & 0xFF);
+}
+
+ETL_INLINE void msig_e_clear(unsigned index) {
+  etl::stm32f4xx::gpioe.clear((1 << index) & 0xFF);
+}
+
+
 void mtim_init();
 
 ETL_INLINE unsigned mtim_get() {

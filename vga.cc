@@ -295,7 +295,7 @@ void configure_timing(Timing const &timing) {
   configure_h_timer(timing, ApbPeripheral::tim4, tim4);
 
   // Adjust tim3's CC2 value back in time.
-  tim3.write_ccr2(static_cast<Word>(tim3.read_ccr2()) - 7);
+  tim3.write_ccr2(static_cast<Word>(tim3.read_ccr2()) - 20);
 
   // Configure tim3 to distribute its enable signal as its trigger output.
   tim3.write_cr2(GpTimer::cr2_value_t()

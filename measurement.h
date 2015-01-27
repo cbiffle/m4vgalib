@@ -9,6 +9,8 @@ namespace vga {
 
 void msigs_init();
 
+#ifdef DISRUPTIVE_MEASUREMENT
+
 ETL_INLINE void msig_a_set() {
   etl::stm32f4xx::gpioc.set(etl::stm32f4xx::Gpio::p9);
 }
@@ -41,6 +43,25 @@ ETL_INLINE void msig_e_clear(unsigned index) {
   etl::stm32f4xx::gpioe.clear((1 << index) & 0xFF);
 }
 
+#else
+
+ETL_INLINE void msig_a_set() {}
+
+ETL_INLINE void msig_a_clear() {}
+
+ETL_INLINE void msig_a_toggle() {}
+
+ETL_INLINE void msig_b_set() {}
+
+ETL_INLINE void msig_b_clear() {}
+
+ETL_INLINE void msig_b_toggle() {}
+
+ETL_INLINE void msig_e_set(unsigned index) {}
+
+ETL_INLINE void msig_e_clear(unsigned index) {}
+
+#endif
 
 void mtim_init();
 

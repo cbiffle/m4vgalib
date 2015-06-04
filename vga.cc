@@ -384,8 +384,8 @@ void vga_hblank_interrupt()
 
 RAM_CODE
 static void start_of_active_video() {
-  // CC2 indicates start of active video (end of back porch).
-  // This only matters in displayed states.
+  // The start-of-active-video (SAV) event is only significant during visible
+  // lines.
   if (ETL_UNLIKELY(!is_displayed_state(vga::state))) return;
 
   // Clear stream 5 flags (hifcr is a write-1-to-clear register).
@@ -405,6 +405,10 @@ static void start_of_active_video() {
 
 RAM_CODE
 static void end_of_active_video() {
+  // The end-of-active-video (EAV) event is always significant, as it advances
+  // the line state machine and kicks off PendSV.
+
+  // Shut off TIM1; only really matters in half-horizontal mode.
   tim1.write_cr1(AdvTimer::cr1_value_t()
       .with_urs(true)
       .with_cen(false));
@@ -419,19 +423,15 @@ static void end_of_active_video() {
   // Pend a PendSV to process hblank tasks.
   scb.write_icsr(Scb::icsr_value_t().with_pendsvset(true));
 
-  // CC3 indicates end of active video (start of front porch).
-  unsigned line = vga::current_line;
+  // We've finished this line; figure out what to do on the next one.
+  unsigned next_line = vga::current_line + 1;
 
-  if (line == 0) {
-    // Start of frame!  Time to stop displaying pixels.
-    vga::state = vga::State::blank;
-  } else if (line == timing.vsync_start_line
-          || line == timing.vsync_end_line) {
+  if (next_line == timing.vsync_start_line
+      || next_line == timing.vsync_end_line) {
     // Either edge of vsync pulse.
     gpiob.toggle(Gpio::p7);
-  } else if (line ==
-                  static_cast<unsigned short>(timing.video_start_line - 1)) {
-    // Time to start generating the first scan buffer.
+  } else if (next_line == uint16_t(timing.video_start_line - 1)) {
+    // We're one line before scanout begins -- need to start rasterizing.
     vga::state = vga::State::starting;
     if (vga::band_list_head) {
       vga::current_band = *vga::band_list_head;
@@ -439,17 +439,22 @@ static void end_of_active_video() {
       vga::current_band = { nullptr, 0, nullptr };
     }
     vga::band_list_taken = true;
-  } else if (line == timing.video_start_line) {
-    // Time to start output.
+  } else if (next_line == timing.video_start_line) {
+    // Time to start output.  This will cause PendSV to copy rasterization
+    // output into place for scanout, and the next SAV will start DMA.
     vga::state = vga::State::active;
-  } else if (line == static_cast<unsigned short>(timing.video_end_line - 1)) {
-    // Time to stop rendering new scan buffers.
+  } else if (next_line == uint16_t(timing.video_end_line - 1)) {
+    // For the final line, suppress rasterization but continue preparing
+    // previously rasterized data for scanout, and continue starting DMA in
+    // SAV.
     vga::state = vga::State::finishing;
-    line = static_cast<unsigned>(-1);  // Make line roll over to zero.
+  } else if (next_line == uint16_t(timing.video_end_line)) {
+    // All done!  Suppress all scanout activity.
+    vga::state = vga::State::blank;
+    next_line = 0;
   }
 
-  vga::current_line = line + 1;
-
+  vga::current_line = next_line;
 }
 
 RAM_CODE void etl_stm32f4xx_tim3_handler() {
@@ -503,11 +508,23 @@ static vga::Rasterizer *get_rasterizer() {
 
 RAM_CODE
 void etl_armv7m_pend_sv_handler() {
-  if (ETL_LIKELY(is_rendered_state(vga::state))) {
+  // PendSV event is triggered shortly after EAV to process lower-priority
+  // tasks.
+
+  // First, prepare for scanout from SAV on this line.  This has two purposes:
+  // it frees up the rasterization target buffer so that we can overwrite it,
+  // and it applies pixel timing choices from the *last* rasterizer run to the
+  // scanout machine so that we can replace them as well.
+  //
+  // This writes to the scanout buffer *and* accesses AHB/APB peripherals, so it
+  // *cannot* run concurrently with scanout -- so we do it first, during hblank.
+  if (ETL_LIKELY(is_displayed_state(vga::state))) {
     if (vga::scan_buffer_needs_update) {
-      // Flip working_buffer into scan_buffer.
-      // We know its contents are ready because otherwise we wouldn't take a new
-      // PendSV.
+      // Flip working_buffer into scan_buffer.  We know its contents are ready
+      // because of the scan_buffer_needs_update flag.  Note that the flag may
+      // not have been set, even in a displayed state, if we're repeating a
+      // line.
+      //
       // Note that GCC can't see that we've aligned the buffers correctly, so we
       // have to do a multi-cast dance. :-/
       ((Word *) (void *) vga::scan_buffer)[
@@ -556,26 +573,29 @@ void etl_armv7m_pend_sv_handler() {
     }
   }
 
+  // Allow the application to do additional work during what's left of hblank.
   vga_hblank_interrupt();
 
+  // Second, rasterize the *next* line, if there's a useful next line.
+  // Rasterization can take a while, and may run concurrently with scanout.
+  // As a result, we just stash our results in places where the *next* PendSV
+  // will find and apply them.
   if (ETL_LIKELY(is_rendered_state(vga::state))) {
-    vga::Timing const &timing = vga::current_timing;
-    unsigned line = vga::current_line;
-    if (line >= timing.video_start_line && line <= timing.video_end_line) {
-      unsigned visible_line = line - timing.video_start_line;
+    auto const &timing = vga::current_timing;
+    auto next_line = vga::current_line + 1;
+    auto visible_line = next_line - timing.video_start_line;
 
-      bool band_edge = advance_rasterizer_band();
-      if (vga::working_buffer_shape.repeat_lines == 0 || band_edge) {
-        vga::Rasterizer *r = get_rasterizer();
-        if (r) {
-          vga::working_buffer_shape = r->rasterize(visible_line,
-                                                   vga::working.buffer);
-          vga::scan_buffer_needs_update = true;
-        }
-      } else {  // repeat_lines > 0, not band_edge
-        --vga::working_buffer_shape.repeat_lines;
+    bool band_edge = advance_rasterizer_band();
+    if (vga::working_buffer_shape.repeat_lines == 0 || band_edge) {
+      auto r = get_rasterizer();
+      if (r) {
+        vga::working_buffer_shape = r->rasterize(visible_line,
+                                                 vga::working.buffer);
+        // Request a rewrite of the scanout buffer during next hblank.
+        vga::scan_buffer_needs_update = true;
       }
+    } else {  // repeat_lines > 0, not band_edge
+      --vga::working_buffer_shape.repeat_lines;
     }
   }
-
 }

@@ -44,18 +44,18 @@ Timing const timing_vesa_800x600_60hz = {
     5,        // 5 wait states for 160MHz at 3.3V.
   },
 
-  1056,  // line_pixels
-  128,   // sync_pixels
-  88,    // back_porch_pixels
-  18,    // video_lead
-  800,   // video_pixels,
-  Timing::Polarity::positive,
+  .line_pixels       = 1056,
+  .sync_pixels       = 128,
+  .back_porch_pixels = 88,
+  .video_lead        = 18,
+  .video_pixels      = 800,
+  .hsync_polarity    = Timing::Polarity::positive,
 
-  1,
-  1 + 4,
-  1 + 4 + 23,
-  1 + 4 + 23 + 600,
-  Timing::Polarity::positive,
+  .vsync_start_line = 1,
+  .vsync_end_line   = 1 + 4,
+  .video_start_line = 1 + 4 + 23,
+  .video_end_line   = 1 + 4 + 23 + 600,
+  .vsync_polarity   = Timing::Polarity::positive,
 };
 
 }  // namespace vga

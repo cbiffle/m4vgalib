@@ -487,17 +487,17 @@ RAM_CODE void etl_stm32f4xx_tim4_handler() {
 }
 
 RAM_CODE
-static bool advance_rasterizer_band() {
+static bool advance_rasterizer_band(bool edge = false) {
   if (vga::current_band.line_count) {
     --vga::current_band.line_count;
-    return false;
+    return edge;
+  }
+
+  if (vga::current_band.next) {
+    vga::current_band = *vga::current_band.next;
+    return advance_rasterizer_band(true);
   } else {
-    if (vga::current_band.next) {
-      vga::current_band = *vga::current_band.next;
-      return true;
-    } else {
-      return false;
-    }
+    return edge;
   }
 }
 

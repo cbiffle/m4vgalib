@@ -9,7 +9,6 @@ SolidColor::SolidColor(unsigned width, Pixel color)
   : _width(width),
     _color(color) {}
 
-
 __attribute__((section(".ramcode")))
 Rasterizer::RasterInfo SolidColor::rasterize(unsigned, Pixel *target) {
   unsigned words = _width / 4;
@@ -21,7 +20,7 @@ Rasterizer::RasterInfo SolidColor::rasterize(unsigned, Pixel *target) {
     target32[i] = color32;
   }
 
-  return { 0, words * 4, 0, 0 };
+  return { 0, words * 4, 0, 1000 };
 }
 
 void SolidColor::set_color(Pixel c) {

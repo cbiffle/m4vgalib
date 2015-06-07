@@ -20,8 +20,9 @@
 #include "etl/stm32f4xx/dma.h"
 #include "etl/stm32f4xx/flash.h"
 #include "etl/stm32f4xx/gpio.h"
-#include "etl/stm32f4xx/interrupt_table.h"
 #include "etl/stm32f4xx/interrupts.h"
+#include "etl/stm32f4xx/interrupt_table.h"
+#include "etl/stm32f4xx/pwr.h"
 #include "etl/stm32f4xx/syscfg.h"
 
 #include "vga/arena.h"
@@ -38,8 +39,8 @@ using etl::armv7m::Word;
 using etl::stm32f4xx::AdvTimer;
 using etl::stm32f4xx::AhbPeripheral;
 using etl::stm32f4xx::ApbPeripheral;
-using etl::stm32f4xx::Dbg;
 using etl::stm32f4xx::dbg;
+using etl::stm32f4xx::Dbg;
 using etl::stm32f4xx::Dma;
 using etl::stm32f4xx::dma2;
 using etl::stm32f4xx::flash;
@@ -47,6 +48,7 @@ using etl::stm32f4xx::Gpio;
 using etl::stm32f4xx::gpioc;
 using etl::stm32f4xx::gpioe;
 using etl::stm32f4xx::Interrupt;
+using etl::stm32f4xx::pwr;
 using etl::stm32f4xx::rcc;
 using etl::stm32f4xx::syscfg;
 using etl::stm32f4xx::tim1;
@@ -134,6 +136,7 @@ void init() {
   rcc.enable_clock(AhbPeripheral::gpioc);  // Sync signals
   rcc.enable_clock(AhbPeripheral::gpioe);  // Video
   rcc.enable_clock(AhbPeripheral::dma2);
+  rcc.enable_clock(ApbPeripheral::pwr);
 
   // Configure our interrupt priorities.  The scheme is:
   //  TIM8 (horizontal) gets highest priority.
@@ -152,6 +155,10 @@ void init() {
                   .with_dcen(true)
                   .with_icen(true)
                   .with_prften(true));
+
+  // Make scanout RAM exist.
+  pwr.write_cr(pwr.read_cr().with_dbp(true));
+  rcc.enable_clock(AhbPeripheral::bkpsram);
 
   band_list_head = nullptr;
   band_list_taken = false;

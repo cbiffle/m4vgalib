@@ -472,6 +472,15 @@ static void end_of_active_video() {
       current_band = *band_list_head;
     } else {
       current_band = { nullptr, 0, nullptr };
+
+      // Load up a fake rasterizer output, to coopt the normal scan code into
+      // suppressing output.
+      working_buffer_shape = {
+        .offset = 0,
+        .length = 0,
+        .stretch_cycles = 0,
+        .repeat_lines = 0,
+      };
     }
     band_list_taken = true;
   } else if (next_line == current_timing.video_start_line) {

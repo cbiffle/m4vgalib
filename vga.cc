@@ -64,11 +64,24 @@ using etl::stm32f4xx::tim4;
 namespace vga {
 
 /*******************************************************************************
- * Driver state and configuration.
+ * Driver configuration.
  */
 
 // Used to adjust size of scan_buffer.
 static constexpr unsigned max_pixels_per_line = 800;
+
+// Common fields used in scanout DMA transfer settings.
+static constexpr auto dma_xfer_common = Dma::Stream::cr_value_t()
+  .with_chsel(6)  // for TIM1_UP
+  .with_pl(Dma::Stream::cr_value_t::pl_t::very_high)
+  .with_pburst(Dma::Stream::BurstSize::single)
+  .with_mburst(Dma::Stream::BurstSize::single)
+  .with_en(true);
+
+
+/*******************************************************************************
+ * Driver state.
+ */
 
 // A copy of the current Timing, held in RAM for fast access.
 static Timing current_timing;
@@ -100,15 +113,25 @@ inline bool is_rendered_state(State s) {
 // Finally, the actual variable.
 static State volatile state;
 
-// This is the DMA source for scan-out, filled during pend_sv.
-// It's aligned for DMA.
-// It contains four trailing pixels that are kept black for blanking.
+// This is the DMA source for scan-out, copied from the working buffer during
+// pend_sv.  It must be located in DMA-capable RAM, and is aligned to allow for
+// word-sized DMA reads.
+//
+// It contains four trailing pixels that are kept black for blanking.  To
+// ensure that the video goes dark during hblank, we simply send one extra word
+// of data.
 alignas(4) IN_SCAN_RAM
 static Pixel scan_buffer[max_pixels_per_line + 4];
 
-// This is the intermediate buffer used during rasterization.
-// It should be close to the CPU and need not be DMA-capable.
-// It's aligned to make copying it more efficient.
+// This is the working buffer, the target of the Rasterizer.  Its contents will
+// be copied to the scan_buffer during hblank if needed.  It need not be in
+// DMA-capable RAM.
+//
+// It's aligned so we can use a high-speed word copy routine.
+//
+// It has invisible padding at either end because it makes certain tile
+// scrolling algorithms simpler to implement if they need not color precisely
+// within the lines.
 alignas(4) IN_LOCAL_RAM
 static struct {
   Pixel left_pad[16];
@@ -116,18 +139,41 @@ static struct {
   Pixel right_pad[16];
 } working;
 
+// A description of the contents of the working buffer, produced by the last
+// Rasterizer that was applied.  This is used to adjust the output timings.
 static Rasterizer::RasterInfo working_buffer_shape;
-static Dma::Stream::cr_value_t next_dma_xfer;
-static constexpr auto dma_xfer_common = Dma::Stream::cr_value_t()
-  .with_chsel(6)  // for TIM1_UP
-  .with_pl(Dma::Stream::cr_value_t::pl_t::very_high)
-  .with_pburst(Dma::Stream::BurstSize::single)
-  .with_mburst(Dma::Stream::BurstSize::single)
-  .with_en(true);
+
+// When a Rasterizer completes and updates the working buffer, we set this
+// flag.  This triggers a copy into the scan buffer at next hblank, at which
+// time the flag is cleared.  The copy is conditional because it isn't always
+// necessary, e.g. in rasterizer that use line-doubling, so we can save some
+// resources by eliding it.
+//
+// Since this is produced and consumed by interrupts running at a single
+// priority, it need not be volatile or atomic.
 static bool scan_buffer_needs_update;
 
+// A pre-built control register word to be used to start the next DMA transfer.
+// This is set up during hblank based on the working_buffer_shape, and consumed
+// at start of active video.
+static Dma::Stream::cr_value_t next_dma_xfer;
+
+// The head of the linked list of Rasterizer bands.
 static Band const *band_list_head;
+
+// A copy of the band we're currently processing.  We copy for several reasons:
+// - So that the application may keep its Bands in Flash without a latency
+//   penalty on the driver.
+// - So that we may mutate it, decrementing the line count.
+// - So that the application may rewrite its Bands once rendering starts.
 static Band current_band;
+
+// A semaphore used to indicate, to the application, when the driver has
+// begun processing the most recently configured band list.  Because the
+// driver maintains a copy of a Band, and this copy contains a pointer, it
+// is not safe to deallocate or repurpose a list of Bands while the driver
+// may be using them.  Instead, clear_band_list does it safely using this
+// semaphore.
 static std::atomic<bool> band_list_taken{false};
 
 
@@ -368,23 +414,16 @@ void sync_to_vblank() {
   wait_for_vblank();
 }
 
-void default_hblank_interrupt();  // decl hack
-RAM_CODE void default_hblank_interrupt() {}
-
-}  // namespace vga
-
-void vga_hblank_interrupt()
-  __attribute__((weak, alias("_ZN3vga24default_hblank_interruptEv")));
-
 /*******************************************************************************
- * Horizontal timing interrupt.
+ * Horizontal timing implementation.  See also the ISR, declared outside of
+ * namespace vga toward the end of the file.
  */
 
 RAM_CODE
 static void start_of_active_video() {
   // The start-of-active-video (SAV) event is only significant during visible
   // lines.
-  if (ETL_UNLIKELY(!is_displayed_state(vga::state))) return;
+  if (ETL_UNLIKELY(!is_displayed_state(state))) return;
 
   // Clear stream 5 flags (hifcr is a write-1-to-clear register).
   dma2.write_hifcr(Dma::hifcr_value_t()
@@ -398,7 +437,7 @@ static void start_of_active_video() {
       .with_urs(true)
       .with_cen(true));
 
-  dma2.stream5.write_cr(vga::next_dma_xfer);
+  dma2.stream5.write_cr(next_dma_xfer);
 }
 
 RAM_CODE
@@ -411,49 +450,179 @@ static void end_of_active_video() {
       .with_urs(true)
       .with_cen(false));
 
-  vga::Timing const &timing = vga::current_timing;
-
   // Apply timing changes requested by the last rasterizer.
-  tim4.write_ccr2(timing.sync_pixels
-                  + timing.back_porch_pixels - timing.video_lead
-                  + vga::working_buffer_shape.offset);
+  tim4.write_ccr2(current_timing.sync_pixels
+                  + current_timing.back_porch_pixels - current_timing.video_lead
+                  + working_buffer_shape.offset);
 
   // Pend a PendSV to process hblank tasks.
   scb.write_icsr(Scb::icsr_value_t().with_pendsvset(true));
 
   // We've finished this line; figure out what to do on the next one.
-  unsigned next_line = vga::current_line + 1;
+  unsigned next_line = current_line + 1;
 
-  if (next_line == timing.vsync_start_line
-      || next_line == timing.vsync_end_line) {
+  if (next_line == current_timing.vsync_start_line
+      || next_line == current_timing.vsync_end_line) {
     // Either edge of vsync pulse.
     gpiob.toggle(Gpio::p7);
-  } else if (next_line == uint16_t(timing.video_start_line - 1)) {
+  } else if (next_line == uint16_t(current_timing.video_start_line - 1)) {
     // We're one line before scanout begins -- need to start rasterizing.
-    vga::state = vga::State::starting;
-    if (vga::band_list_head) {
-      vga::current_band = *vga::band_list_head;
+    state = State::starting;
+    if (band_list_head) {
+      current_band = *band_list_head;
     } else {
-      vga::current_band = { nullptr, 0, nullptr };
+      current_band = { nullptr, 0, nullptr };
     }
-    vga::band_list_taken = true;
-  } else if (next_line == timing.video_start_line) {
+    band_list_taken = true;
+  } else if (next_line == current_timing.video_start_line) {
     // Time to start output.  This will cause PendSV to copy rasterization
     // output into place for scanout, and the next SAV will start DMA.
-    vga::state = vga::State::active;
-  } else if (next_line == uint16_t(timing.video_end_line - 1)) {
+    state = State::active;
+  } else if (next_line == uint16_t(current_timing.video_end_line - 1)) {
     // For the final line, suppress rasterization but continue preparing
     // previously rasterized data for scanout, and continue starting DMA in
     // SAV.
-    vga::state = vga::State::finishing;
-  } else if (next_line == uint16_t(timing.video_end_line)) {
+    state = State::finishing;
+  } else if (next_line == uint16_t(current_timing.video_end_line)) {
     // All done!  Suppress all scanout activity.
-    vga::state = vga::State::blank;
+    state = State::blank;
     next_line = 0;
   }
 
-  vga::current_line = next_line;
+  current_line = next_line;
 }
+
+void default_hblank_interrupt();  // decl hack
+RAM_CODE void default_hblank_interrupt() {}
+
+
+/*******************************************************************************
+ * Rasterization interface.  These are implementation factors of the PendSV
+ * ISR.
+ */
+
+/*
+ * Advances the current rasterizer band, possibly switching it for the next if
+ * we've reached the end.  The 'edge' parameter is used only in the recursive
+ * case.  (It would not appear at all if this language had nested functions.)
+ */
+RAM_CODE
+static bool advance_rasterizer_band(bool edge = false) {
+  if (current_band.line_count) {
+    --current_band.line_count;
+    return edge;
+  }
+
+  if (current_band.next) {
+    current_band = *current_band.next;
+    return advance_rasterizer_band(true);
+  } else {
+    return edge;
+  }
+}
+
+/*
+ * Transfers the contents of the working buffer into the scan buffer, if
+ * necessary.
+ */
+RAM_CODE
+static void update_scan_buffer() {
+  if (scan_buffer_needs_update) {
+    // Flip working_buffer into scan_buffer.  We know its contents are ready
+    // because of the scan_buffer_needs_update flag.  Note that the flag may
+    // not have been set, even in a displayed state, if we're repeating a
+    // line.
+    //
+    // Note that GCC can't see that we've aligned the buffers correctly, so we
+    // have to do a multi-cast dance. :-/
+    ((Word *) (void *) scan_buffer)[
+        working_buffer_shape.length / 4] = 0;
+    copy_words(
+        reinterpret_cast<Word const *>(
+          static_cast<void *>(working.buffer)),
+        reinterpret_cast<Word *>(
+          static_cast<void *>(scan_buffer)),
+        working_buffer_shape.length / 4);
+    scan_buffer_needs_update = false;
+  }
+}
+
+/*
+ * Prepares a configuration for the DMA stream and configures the horizontal
+ * timer, if it's relevant to this mode.
+ */
+RAM_CODE
+static void prepare_for_scanout() {
+  auto & st = dma2.stream5;
+  if (working_buffer_shape.stretch_cycles) {
+    // Adjust reload frequency of TIM1 to accomodate desired pixel clock.
+    tim1.write_arr(working_buffer_shape.stretch_cycles + 4 - 1);
+    // Force an update to reset the timer state.
+    tim1.write_egr(AdvTimer::egr_value_t().with_ug(true));
+    // Nudge the count down to delay the first DRQ (fudge factor)
+    tim1.write_cnt(uint32_t(-4));
+
+    st.write_par(0x40021015);  // High byte of GPIOE ODR (hack hack)
+    st.write_m0ar(reinterpret_cast<Word>(&scan_buffer));
+    st.write_ndtr(working_buffer_shape.length + 4);
+
+    next_dma_xfer = dma_xfer_common
+        .with_dir(Dma::Stream::cr_value_t::dir_t::memory_to_peripheral)
+        .with_msize(Dma::Stream::TransferSize::word)
+        .with_minc(true)
+        .with_psize(Dma::Stream::TransferSize::byte)
+        .with_pinc(false);
+  } else {
+    st.write_ndtr(working_buffer_shape.length / 4 + 1);
+    // Note that we're using memory as the peripheral side.
+    // This DMA controller is a little odd.
+    st.write_par(reinterpret_cast<Word>(&scan_buffer));
+    st.write_m0ar(0x40021015);  // High byte of GPIOE ODR (hack hack)
+
+    next_dma_xfer = dma_xfer_common
+        .with_dir(Dma::Stream::cr_value_t::dir_t::memory_to_memory)
+        .with_psize(Dma::Stream::TransferSize::word)
+        .with_pinc(true)
+        .with_msize(Dma::Stream::TransferSize::byte)
+        .with_minc(false);
+  }
+}
+
+/*
+ * Generates pixels for the *next* line, not the currently displaying one.
+ */
+RAM_CODE
+static void rasterize_next_line() {
+  auto const &timing = current_timing;
+  auto next_line = current_line + 1;
+  auto visible_line = next_line - timing.video_start_line;
+
+  bool band_edge = advance_rasterizer_band();
+  if (working_buffer_shape.repeat_lines == 0 || band_edge) {
+    // Either the last rasterizer has run out of its repeat count and wants
+    // to be called again, or we've reached a band edge and are going to call
+    // the new rasterizer no matter what the old one wished.
+    auto r = current_band.rasterizer;
+    if (r) {
+      working_buffer_shape = r->rasterize(visible_line,
+          working.buffer);
+      // Request a rewrite of the scanout buffer during next hblank.
+      scan_buffer_needs_update = true;
+    }
+  } else {  // repeat_lines > 0, not band_edge
+    --working_buffer_shape.repeat_lines;
+  }
+}
+
+}  // namespace vga
+
+
+/*******************************************************************************
+ * ISRs and user interrupt hook
+ */
+
+void vga_hblank_interrupt()
+  __attribute__((weak, alias("_ZN3vga24default_hblank_interruptEv")));
 
 RAM_CODE void etl_stm32f4xx_tim3_handler() {
   // We access this APB2 timer through the bridge on AHB1.  This implies
@@ -473,35 +642,15 @@ RAM_CODE void etl_stm32f4xx_tim4_handler() {
 
   if (ETL_LIKELY(sr.get_cc2if())) {
     tim4.write_sr(sr.with_cc2if(false));
-    start_of_active_video();
+    vga::start_of_active_video();
     return;
   }
 
   if (sr.get_cc3if()) {
     tim4.write_sr(sr.with_cc3if(false));
-    end_of_active_video();
+    vga::end_of_active_video();
     return;
   }
-}
-
-RAM_CODE
-static bool advance_rasterizer_band(bool edge = false) {
-  if (vga::current_band.line_count) {
-    --vga::current_band.line_count;
-    return edge;
-  }
-
-  if (vga::current_band.next) {
-    vga::current_band = *vga::current_band.next;
-    return advance_rasterizer_band(true);
-  } else {
-    return edge;
-  }
-}
-
-RAM_CODE
-static vga::Rasterizer *get_rasterizer() {
-  return vga::current_band.rasterizer;
 }
 
 RAM_CODE
@@ -517,58 +666,8 @@ void etl_armv7m_pend_sv_handler() {
   // This writes to the scanout buffer *and* accesses AHB/APB peripherals, so it
   // *cannot* run concurrently with scanout -- so we do it first, during hblank.
   if (ETL_LIKELY(is_displayed_state(vga::state))) {
-    if (vga::scan_buffer_needs_update) {
-      // Flip working_buffer into scan_buffer.  We know its contents are ready
-      // because of the scan_buffer_needs_update flag.  Note that the flag may
-      // not have been set, even in a displayed state, if we're repeating a
-      // line.
-      //
-      // Note that GCC can't see that we've aligned the buffers correctly, so we
-      // have to do a multi-cast dance. :-/
-      ((Word *) (void *) vga::scan_buffer)[
-          vga::working_buffer_shape.length / 4] = 0;
-      copy_words(
-          reinterpret_cast<Word const *>(
-            static_cast<void *>(vga::working.buffer)),
-          reinterpret_cast<Word *>(
-            static_cast<void *>(vga::scan_buffer)),
-          vga::working_buffer_shape.length / 4);
-      vga::scan_buffer_needs_update = false;
-    }
-
-    auto & st = dma2.stream5;
-    if (vga::working_buffer_shape.stretch_cycles) {
-      // Adjust reload frequency of TIM1 to accomodate desired pixel clock.
-      tim1.write_arr(vga::working_buffer_shape.stretch_cycles + 4 - 1);
-      // Force an update to reset the timer state.
-      tim1.write_egr(AdvTimer::egr_value_t().with_ug(true));
-      // Nudge the count down to delay the first DRQ (fudge factor)
-      tim1.write_cnt(uint32_t(-4));
-
-      st.write_par(0x40021015);  // High byte of GPIOE ODR (hack hack)
-      st.write_m0ar(reinterpret_cast<Word>(&vga::scan_buffer));
-      st.write_ndtr(vga::working_buffer_shape.length + 4);
-
-      vga::next_dma_xfer = vga::dma_xfer_common
-          .with_dir(Dma::Stream::cr_value_t::dir_t::memory_to_peripheral)
-          .with_msize(Dma::Stream::TransferSize::word)
-          .with_minc(true)
-          .with_psize(Dma::Stream::TransferSize::byte)
-          .with_pinc(false);
-    } else {
-      st.write_ndtr(vga::working_buffer_shape.length / 4 + 1);
-      // Note that we're using memory as the peripheral side.
-      // This DMA controller is a little odd.
-      st.write_par(reinterpret_cast<Word>(&vga::scan_buffer));
-      st.write_m0ar(0x40021015);  // High byte of GPIOE ODR (hack hack)
-
-      vga::next_dma_xfer = vga::dma_xfer_common
-          .with_dir(Dma::Stream::cr_value_t::dir_t::memory_to_memory)
-          .with_psize(Dma::Stream::TransferSize::word)
-          .with_pinc(true)
-          .with_msize(Dma::Stream::TransferSize::byte)
-          .with_minc(false);
-    }
+    vga::update_scan_buffer();
+    vga::prepare_for_scanout();
   }
 
   // Allow the application to do additional work during what's left of hblank.
@@ -579,21 +678,6 @@ void etl_armv7m_pend_sv_handler() {
   // As a result, we just stash our results in places where the *next* PendSV
   // will find and apply them.
   if (ETL_LIKELY(is_rendered_state(vga::state))) {
-    auto const &timing = vga::current_timing;
-    auto next_line = vga::current_line + 1;
-    auto visible_line = next_line - timing.video_start_line;
-
-    bool band_edge = advance_rasterizer_band();
-    if (vga::working_buffer_shape.repeat_lines == 0 || band_edge) {
-      auto r = get_rasterizer();
-      if (r) {
-        vga::working_buffer_shape = r->rasterize(visible_line,
-                                                 vga::working.buffer);
-        // Request a rewrite of the scanout buffer during next hblank.
-        vga::scan_buffer_needs_update = true;
-      }
-    } else {  // repeat_lines > 0, not band_edge
-      --vga::working_buffer_shape.repeat_lines;
-    }
+    vga::rasterize_next_line();
   }
 }

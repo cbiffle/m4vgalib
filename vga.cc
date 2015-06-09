@@ -69,8 +69,6 @@ namespace vga {
 
 // Used to adjust size of scan_buffer.
 static constexpr unsigned max_pixels_per_line = 800;
-// Used to size rasterization plan.
-static constexpr unsigned max_lines = 600;
 
 // A copy of the current Timing, held in RAM for fast access.
 static Timing current_timing;

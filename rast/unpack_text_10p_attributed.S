@@ -30,12 +30,6 @@
 @ Otherwise, the implementation is very similar to the 1bpp unpacker, just with
 @ a CLUT that changes every 10 pixels.
 
-@ My version of binutils doesn't understand APSR_g.
-.macro msr_APSR_g, rn
-  .hword 0xF380 | \rn
-  .hword 0x8400
-.endm
-
 @ Inputs:
 @  r0  input line.
 @  r1  font pointer.
@@ -58,12 +52,6 @@ _ZN3vga4rast31unpack_text_10p_attributed_implEPKvPKhPhj:
       color0  .req r6
       bits    .req r7
       lsbs    .req lr
-
-      @ Because we can't use a register alias with this particular macro,
-      @ provide shorthand.
-      .macro msr_APSR_g_bits
-        msr_APSR_g 7  @ bits == r7 (above)
-      .endm
 
       push {fore, back, color0, bits, lsbs}
 
@@ -95,12 +83,12 @@ _ZN3vga4rast31unpack_text_10p_attributed_implEPKvPKhPhj:
       @ First, shift the glyph bits so the LSBs are in 19:16.
       @ The high-order bits are preserved in 23:20.
       lsls bits, #16
-      msr_APSR_g_bits
+      msr APSR_g, bits
       sel color0, fore, back
 
       @ Now do it again.
       lsrs bits, #4
-      msr_APSR_g_bits
+      msr APSR_g, bits
       sel bits, fore, back    @ bits now holds pixels
 
       @ Advance column; hoisted to help speculation of the branch below.

@@ -36,7 +36,7 @@ _Z10copy_wordsPKmPmm:
       vldmcs.32 src!, {s0}                                        @ 2
       vstmcs.32 dst!, {s0}                                        @ 2
 
-      @ Transfer n+1 words.  Leaves instruction stream aligned 2-mod-4.
+      @ Transfer n+1 words.
       .macro XFER n                             @ 5 + 2*n
         lsrs.n count, #1                        @ 1
         itt cs                                  @ 0 (aligned)

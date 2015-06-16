@@ -33,6 +33,8 @@
 
 using std::size_t;
 
+using etl::armv7m::Byte;
+using etl::armv7m::HalfWord;
 using etl::armv7m::scb;
 using etl::armv7m::Scb;
 using etl::armv7m::Word;
@@ -67,8 +69,20 @@ namespace vga {
  * Driver configuration.
  */
 
-// Used to adjust size of scan_buffer.
-static constexpr unsigned max_pixels_per_line = 800;
+static constexpr unsigned
+  // Used to adjust size of scan_buffer.
+  max_pixels_per_line = 800,
+  // Cycles per pixel at fastest rate.
+  min_cycles_per_pixel = 4,
+  // Fudge factor: shifts timer-initiated DRQ back in time by this many cycles,
+  // to delay DRQ until DMA has started.
+  drq_shift_cycles = 4,
+  // Fudge factor: how long the shock absorber IRQ should lead the actual start
+  // of video IRQ, in cycles.
+  shock_absorber_shift_cycles = 20,
+  // Amount of pad to place on either side of the working buffer, so that lazy
+  // rasterizers can scribble slightly outside the lines -- in words.
+  extra_pad_words = 4;
 
 // Common fields used in scanout DMA transfer settings.
 static constexpr auto dma_xfer_common = Dma::Stream::cr_value_t()
@@ -117,11 +131,11 @@ static State volatile state;
 // pend_sv.  It must be located in DMA-capable RAM, and is aligned to allow for
 // word-sized DMA reads.
 //
-// It contains four trailing pixels that are kept black for blanking.  To
-// ensure that the video goes dark during hblank, we simply send one extra word
-// of data.
-alignas(4) IN_SCAN_RAM
-static Pixel scan_buffer[max_pixels_per_line + 4];
+// It contains an extra word's worth of pixels to ensure that we can follow
+// every line with an extra transfer to blank the outputs.  The extra pixels
+// are blanked after the rasterizer returns.
+alignas(Word) IN_SCAN_RAM
+static Pixel scan_buffer[max_pixels_per_line + sizeof(Word)];
 
 // This is the working buffer, the target of the Rasterizer.  Its contents will
 // be copied to the scan_buffer during hblank if needed.  It need not be in
@@ -132,11 +146,11 @@ static Pixel scan_buffer[max_pixels_per_line + 4];
 // It has invisible padding at either end because it makes certain tile
 // scrolling algorithms simpler to implement if they need not color precisely
 // within the lines.
-alignas(4) IN_LOCAL_RAM
+alignas(Word) IN_LOCAL_RAM
 static struct {
-  Pixel left_pad[16];
+  Word left_pad[extra_pad_words];
   Pixel buffer[max_pixels_per_line];
-  Pixel right_pad[16];
+  Word right_pad[extra_pad_words];
 } working;
 
 // A description of the contents of the working buffer, produced by the last
@@ -339,7 +353,7 @@ void configure_timing(Timing const &timing) {
   configure_h_timer(timing, ApbPeripheral::tim4, tim4);
 
   // Adjust tim3's CC2 value back in time.
-  tim3.write_ccr2(static_cast<Word>(tim3.read_ccr2()) - 20);
+  tim3.write_ccr2(Word(tim3.read_ccr2()) - shock_absorber_shift_cycles);
 
   // Configure tim3 to distribute its enable signal as its trigger output.
   tim3.write_cr2(GpTimer::cr2_value_t()
@@ -373,11 +387,10 @@ void configure_timing(Timing const &timing) {
     working.buffer[i + 1] = 0x00;
   }
 
-  // Blank the final four pixels of the scan buffer.
-  scan_buffer[timing.video_pixels + 0] = 0;
-  scan_buffer[timing.video_pixels + 1] = 0;
-  scan_buffer[timing.video_pixels + 2] = 0;
-  scan_buffer[timing.video_pixels + 3] = 0;
+  // Blank the final word of the scan buffer.
+  for (unsigned i = 0; i < sizeof(Word); ++i) {
+    scan_buffer[timing.video_pixels + i] = 0;
+  }
 
   // Set up global state.
   current_line = 0;
@@ -549,8 +562,8 @@ static void update_scan_buffer() {
           static_cast<void *>(working.buffer)),
         reinterpret_cast<Word *>(
           static_cast<void *>(scan_buffer)),
-        (working_buffer_shape.length + 3) / 4);
-    for (unsigned i = 0; i < 4; ++i) {
+        (working_buffer_shape.length + sizeof(Word) - 1) / sizeof(Word));
+    for (unsigned i = 0; i < sizeof(Word); ++i) {
       scan_buffer[working_buffer_shape.length + i] = 0;
     }
     scan_buffer_needs_update = false;
@@ -568,13 +581,15 @@ static void prepare_for_scanout() {
 
   if (working_buffer_shape.stretch_cycles) {
     // Adjust reload frequency of TIM1 to accomodate desired pixel clock.
-    tim1.write_arr(working_buffer_shape.stretch_cycles + 4 - 1);
+    // (ARR value is period - 1.)
+    tim1.write_arr(
+        working_buffer_shape.stretch_cycles + min_cycles_per_pixel - 1);
     // Force an update to reset the timer state.
     tim1.write_egr(AdvTimer::egr_value_t().with_ug(true));
     // Configure the timer as *almost* ready to produce a DRQ, less a small
     // value (fudge factor).  Gotta do this after the update event, above,
     // because that clears CNT.
-    tim1.write_cnt(uint32_t(tim1.read_arr()) - 4);
+    tim1.write_cnt(uint32_t(tim1.read_arr()) - drq_shift_cycles);
 
     st.write_par(0x40021015);  // High byte of GPIOE ODR (hack hack)
     st.write_m0ar(reinterpret_cast<Word>(&scan_buffer));
@@ -582,22 +597,21 @@ static void prepare_for_scanout() {
     // The number of bytes read must exactly match the number of bytes written,
     // or the DMA controller will freak out.  Thus, we must adapt the transfer
     // size to the number of bytes transferred.
-    // TODO: this can actually cause problems with *very slow* pixel clocks.
     Dma::Stream::TransferSize msize;
     switch (working_buffer_shape.length & 3) {
       case 0:
         msize = Dma::Stream::TransferSize::word;
-        st.write_ndtr(working_buffer_shape.length + 4);
+        st.write_ndtr(working_buffer_shape.length + sizeof(Word));
         break;
 
       case 2:
         msize = Dma::Stream::TransferSize::half_word;
-        st.write_ndtr(working_buffer_shape.length + 2);
+        st.write_ndtr(working_buffer_shape.length + sizeof(HalfWord));
         break;
 
       default:
         msize = Dma::Stream::TransferSize::byte;
-        st.write_ndtr(working_buffer_shape.length + 1);
+        st.write_ndtr(working_buffer_shape.length + sizeof(Byte));
         break;
     }
 
@@ -618,17 +632,17 @@ static void prepare_for_scanout() {
     switch (working_buffer_shape.length & 3) {
       case 0:
         psize = Dma::Stream::TransferSize::word;
-        st.write_ndtr(working_buffer_shape.length / 4 + 1);
+        st.write_ndtr(working_buffer_shape.length / sizeof(Word) + 1);
         break;
 
       case 2:
         psize = Dma::Stream::TransferSize::half_word;
-        st.write_ndtr(working_buffer_shape.length / 2 + 1);
+        st.write_ndtr(working_buffer_shape.length / sizeof(HalfWord) + 1);
         break;
 
       default:
         psize = Dma::Stream::TransferSize::byte;
-        st.write_ndtr(working_buffer_shape.length + 1);
+        st.write_ndtr(working_buffer_shape.length / sizeof(Byte) + 1);
         break;
     }
 

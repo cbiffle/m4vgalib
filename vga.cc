@@ -201,7 +201,7 @@ void init() {
                .with_dmdis(true)
                .with_feie(false));
 
-  // Configure the pixel-generation timer used during half-horizontal mode.
+  // Configure the pixel-generation timer used during reduced-horizontal mode.
   // We use TIM1; it's an APB2 (fast) peripheral, and with our clock config
   // it gets clocked at the full CPU rate.  We'll load ARR under rasterizer
   // control to synthesize 1/n rates.
@@ -445,7 +445,7 @@ static void end_of_active_video() {
   // The end-of-active-video (EAV) event is always significant, as it advances
   // the line state machine and kicks off PendSV.
 
-  // Shut off TIM1; only really matters in half-horizontal mode.
+  // Shut off TIM1; only really matters in reduced-horizontal mode.
   tim1.write_cr1(AdvTimer::cr1_value_t()
       .with_urs(true)
       .with_cen(false));
@@ -544,14 +544,15 @@ static void update_scan_buffer() {
     //
     // Note that GCC can't see that we've aligned the buffers correctly, so we
     // have to do a multi-cast dance. :-/
-    ((Word *) (void *) scan_buffer)[
-        working_buffer_shape.length / 4] = 0;
     copy_words(
         reinterpret_cast<Word const *>(
           static_cast<void *>(working.buffer)),
         reinterpret_cast<Word *>(
           static_cast<void *>(scan_buffer)),
-        working_buffer_shape.length / 4);
+        (working_buffer_shape.length + 3) / 4);
+    for (unsigned i = 0; i < 4; ++i) {
+      scan_buffer[working_buffer_shape.length + i] = 0;
+    }
     scan_buffer_needs_update = false;
   }
 }
@@ -563,34 +564,77 @@ static void update_scan_buffer() {
 RAM_CODE
 static void prepare_for_scanout() {
   auto & st = dma2.stream5;
+  st.write_cr(st.read_cr().with_en(false));
+
   if (working_buffer_shape.stretch_cycles) {
     // Adjust reload frequency of TIM1 to accomodate desired pixel clock.
     tim1.write_arr(working_buffer_shape.stretch_cycles + 4 - 1);
     // Force an update to reset the timer state.
     tim1.write_egr(AdvTimer::egr_value_t().with_ug(true));
-    // Nudge the count down to delay the first DRQ (fudge factor)
-    tim1.write_cnt(uint32_t(-4));
+    // Configure the timer as *almost* ready to produce a DRQ, less a small
+    // value (fudge factor).  Gotta do this after the update event, above,
+    // because that clears CNT.
+    tim1.write_cnt(uint32_t(tim1.read_arr()) - 4);
 
     st.write_par(0x40021015);  // High byte of GPIOE ODR (hack hack)
     st.write_m0ar(reinterpret_cast<Word>(&scan_buffer));
-    st.write_ndtr(working_buffer_shape.length + 4);
+
+    // The number of bytes read must exactly match the number of bytes written,
+    // or the DMA controller will freak out.  Thus, we must adapt the transfer
+    // size to the number of bytes transferred.
+    // TODO: this can actually cause problems with *very slow* pixel clocks.
+    Dma::Stream::TransferSize msize;
+    switch (working_buffer_shape.length & 3) {
+      case 0:
+        msize = Dma::Stream::TransferSize::word;
+        st.write_ndtr(working_buffer_shape.length + 4);
+        break;
+
+      case 2:
+        msize = Dma::Stream::TransferSize::half_word;
+        st.write_ndtr(working_buffer_shape.length + 2);
+        break;
+
+      default:
+        msize = Dma::Stream::TransferSize::byte;
+        st.write_ndtr(working_buffer_shape.length + 1);
+        break;
+    }
 
     next_dma_xfer = dma_xfer_common
         .with_dir(Dma::Stream::cr_value_t::dir_t::memory_to_peripheral)
-        .with_msize(Dma::Stream::TransferSize::word)
+        .with_msize(msize)
         .with_minc(true)
         .with_psize(Dma::Stream::TransferSize::byte)
         .with_pinc(false);
+
   } else {
-    st.write_ndtr(working_buffer_shape.length / 4 + 1);
     // Note that we're using memory as the peripheral side.
     // This DMA controller is a little odd.
     st.write_par(reinterpret_cast<Word>(&scan_buffer));
     st.write_m0ar(0x40021015);  // High byte of GPIOE ODR (hack hack)
 
+    Dma::Stream::TransferSize psize;
+    switch (working_buffer_shape.length & 3) {
+      case 0:
+        psize = Dma::Stream::TransferSize::word;
+        st.write_ndtr(working_buffer_shape.length / 4 + 1);
+        break;
+
+      case 2:
+        psize = Dma::Stream::TransferSize::half_word;
+        st.write_ndtr(working_buffer_shape.length / 2 + 1);
+        break;
+
+      default:
+        psize = Dma::Stream::TransferSize::byte;
+        st.write_ndtr(working_buffer_shape.length + 1);
+        break;
+    }
+
     next_dma_xfer = dma_xfer_common
         .with_dir(Dma::Stream::cr_value_t::dir_t::memory_to_memory)
-        .with_psize(Dma::Stream::TransferSize::word)
+        .with_psize(psize)
         .with_pinc(true)
         .with_msize(Dma::Stream::TransferSize::byte)
         .with_minc(false);

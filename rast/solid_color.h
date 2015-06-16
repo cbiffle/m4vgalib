@@ -10,9 +10,9 @@ class SolidColor : public Rasterizer {
 public:
   SolidColor(unsigned width, Pixel color);
 
-  virtual RasterInfo rasterize(unsigned, Pixel *) override;
+  void set_color(Pixel p) { _color = p; }
 
-  void set_color(Pixel);
+  RasterInfo rasterize(unsigned, Pixel *) override;
 
 private:
   unsigned _width;

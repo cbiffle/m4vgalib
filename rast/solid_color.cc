@@ -11,20 +11,14 @@ SolidColor::SolidColor(unsigned width, Pixel color)
 
 __attribute__((section(".ramcode")))
 Rasterizer::RasterInfo SolidColor::rasterize(unsigned, Pixel *target) {
-  unsigned words = _width / 4;
-  unsigned *target32 =
-      reinterpret_cast<unsigned *>(static_cast<void *>(target));
+  target[0] = _color;
 
-  unsigned color32 = _color | (_color << 8) | (_color << 16) | (_color << 24);
-  for (unsigned i = 0; i < words; ++i) {
-    target32[i] = color32;
-  }
-
-  return { 0, words * 4, 0, 1000 };
-}
-
-void SolidColor::set_color(Pixel c) {
-  _color = c;
+  return {
+    .offset = 0,
+    .length = 1,
+    .stretch_cycles = (_width - 1) * 4,
+    .repeat_lines = 1000,
+  };
 }
 
 }  // namespace rast

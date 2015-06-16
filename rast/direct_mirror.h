@@ -1,19 +1,21 @@
-#ifndef VGA_RAST_DIRECT_4_MIRROR_H
-#define VGA_RAST_DIRECT_4_MIRROR_H
+#ifndef VGA_RAST_DIRECT_MIRROR_H
+#define VGA_RAST_DIRECT_MIRROR_H
 
 #include "vga/rasterizer.h"
-#include "vga/rast/direct_4.h"
+#include "vga/rast/direct.h"
 
 namespace vga {
 namespace rast {
 
 /*
- * A variation on Direct_4 that just redraws another rasterizer's content, but
- * upside down.
+ * A variation on Direct that just redraws another rasterizer's content, but
+ * upside down, backwards, and (possibly) vertically shifted.
+ *
+ * If this sounds like a rare use case, that's because it is.
  */
-class Direct_4_Mirror : public Rasterizer {
+class DirectMirror : public Rasterizer {
 public:
-  Direct_4_Mirror(Direct_4 const & rast, unsigned top_line = 0);
+  DirectMirror(Direct const & rast, unsigned top_line = 0);
 
   virtual RasterInfo rasterize(unsigned, Pixel *) override;
 
@@ -23,11 +25,11 @@ public:
   unsigned char *get_bg_buffer() const { return _r.get_bg_buffer(); }
 
 private:
-  Direct_4 const & _r;
+  Direct const & _r;
   unsigned _top_line;
 };
 
 }  // namespace rast
 }  // namespace vga
 
-#endif  // VGA_RAST_DIRECT_4_MIRROR_H
+#endif  // VGA_RAST_DIRECT_MIRROR_H

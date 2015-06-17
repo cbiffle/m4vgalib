@@ -36,21 +36,35 @@ Palette8_4::~Palette8_4() {
 }
 
 __attribute__((section(".ramcode")))
-Rasterizer::RasterInfo Palette8_4::rasterize(unsigned line_number, Pixel *target) {
+Rasterizer::RasterInfo Palette8_4::rasterize(unsigned cycles_per_pixel,
+                                             unsigned line_number,
+                                             Pixel *target) {
   line_number -= _top_line;
   auto repeat = 3 - (line_number % 4);
   line_number /= 4;
 
-  if (ETL_UNLIKELY(line_number >= _height)) return { 0, 0, 0, 0 };
+  if (ETL_UNLIKELY(line_number >= _height)) {
+    return { 0, 0, cycles_per_pixel, 0 };
+  }
 
   unsigned char const *src = _fb[_page1] + _width * line_number;
 
   if (_lerp) {
     unpack_p256_lerp4_impl(src, target, _width, _palette);
-    return { 0, _width * 4 - 1, 0, repeat };
+    return {
+      .offset = 0,
+      .length = _width * 4 - 1,
+      .cycles_per_pixel = cycles_per_pixel,
+      .repeat_lines = repeat,
+    };
   } else {
     unpack_p256_impl(src, target, _width, _palette);
-    return { 0, _width, 12, repeat };
+    return {
+      .offset = 0,
+      .length = _width,
+      .cycles_per_pixel = cycles_per_pixel * 4,
+      .repeat_lines = repeat,
+    };
   }
 }
 

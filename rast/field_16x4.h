@@ -20,7 +20,7 @@ public:
   Field16x4(unsigned width, unsigned height, unsigned top_line = 0);
   ~Field16x4();
 
-  virtual RasterInfo rasterize(unsigned, Pixel *) override;
+  RasterInfo rasterize(unsigned, unsigned, Pixel *) override;
 
   void pend_flip();
   void flip_now();

@@ -1,6 +1,8 @@
 #ifndef VGA_TIMING_H
 #define VGA_TIMING_H
 
+#include <cstdint>
+
 #include "etl/stm32f4xx/rcc.h"
 
 namespace vga {
@@ -15,45 +17,56 @@ struct Timing {
     negative = 1,
   };
 
-  typedef unsigned short ushort;  // a short-hand.  Get it?
-
   /*
-   * The current scanout approach fixes the pixel clock at 4x the CPU (really
-   * AHB) frequency.  The clock_config specifies how to achieve the desired
-   * CPU clock, and thus implicitly defines the CPU clock.
+   * The pixel clock is derived from the CPU clock by a fixed multiplier
+   * (below), making the CPU clock configuration an integral part of the video
+   * timing.
    */
   etl::stm32f4xx::ClockConfig clock_config;
 
   /*
-   * Horizontal timing.
+   * Number of AHB cycles per pixel clock cycle.  Different scanout strategies
+   * are invoked depending on this value.  Historically this was assumed to be
+   * 4, but if you want a higher CPU : pixel clock ratio, go for it.
+   *
+   * Note that no current scanout strategy can achieve fewer than 4 AHB cycles
+   * per pixel clock; attempt this and you'll hit an assert in configure_timing.
+   */
+  std::uint16_t cycles_per_pixel;
+
+  /*
+   * Horizontal timing, expressed in pixels.
    *
    * The horizontal sync pulse implicitly starts at pixel zero of the line.
    *
    * Some of this information is redundant; it's stored this way to avoid
    * having to rederive it in the driver.
    */
-  ushort line_pixels;        // Total, including blanking.
-  ushort sync_pixels;        // Length of pulse.
-  ushort back_porch_pixels;  // Between end of sync and start of video.
-  ushort video_lead;         // Fudge factor: nudge DMA start back in time.
-  ushort video_pixels;       // Maximum pixels in active video.
-  Polarity hsync_polarity;   // Polarity of hsync pulse.
+  std::uint16_t line_pixels;        // Total, including blanking.
+  std::uint16_t sync_pixels;        // Length of pulse.
+  std::uint16_t back_porch_pixels;  // Between end of sync and start of video.
+  std::uint16_t video_lead;         // Fudge factor: nudge DMA back in time.
+  std::uint16_t video_pixels;       // Maximum pixels in active video.
+  Polarity      hsync_polarity;     // Polarity of hsync pulse.
 
   /*
-   * Vertical timing
+   * Vertical timing, expressed in lines.
    *
    * Because vertical timing is done in software, it's a little more flexible
    * than horizontal timing.
    */
-  ushort vsync_start_line;  // Top edge of sync pulse.
-  ushort vsync_end_line;    // Bottom edge of sync pulse.
-  ushort video_start_line;  // Top edge of active video.
-  ushort video_end_line;    // Bottom edge of active video.
-  Polarity vsync_polarity;  // Polarity of vsync pulse.
+  std::uint16_t vsync_start_line;  // Top edge of sync pulse.
+  std::uint16_t vsync_end_line;    // Bottom edge of sync pulse.
+  std::uint16_t video_start_line;  // Top edge of active video.
+  std::uint16_t video_end_line;    // Bottom edge of active video.
+  Polarity      vsync_polarity;    // Polarity of vsync pulse.
 };
 
 /*
- * Canned timings for common modes at our crystal frequency.
+ * Canned timings for common modes at the assumed 8MHz crystal frequency.
+ *
+ * These use the highest CPU frequency at which we can reasonably approximate
+ * the standard pixel clock (to within about 0.05%).
  */
 extern Timing const timing_vesa_640x480_60hz;
 extern Timing const timing_vesa_800x600_60hz;

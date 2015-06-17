@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "etl/assert.h"
 #include "etl/attribute_macros.h"
 #include "etl/prediction.h"
 
@@ -72,8 +73,6 @@ namespace vga {
 static constexpr unsigned
   // Used to adjust size of scan_buffer.
   max_pixels_per_line = 800,
-  // Cycles per pixel at fastest rate.
-  min_cycles_per_pixel = 4,
   // Fudge factor: shifts timer-initiated DRQ back in time by this many cycles,
   // to delay DRQ until DMA has started.
   drq_shift_cycles = 4,
@@ -300,7 +299,15 @@ static void configure_h_timer(Timing const &timing,
                               GpTimer &tim) {
   rcc.enable_clock(p);
   rcc.leave_reset(p);
-  tim.write_psc(2 - 1);  // Count in pixels, 1 pixel = 2 PCLK = 4 CCLK
+
+  // Configure the timer to count in pixels.  These timers live on APB1.
+  // Like all APB timers they get their clocks doubled at certain APB
+  // multipliers.
+  auto apb_cycles_per_pixel = timing.clock_config.apb1_divisor > 1
+      ? (timing.cycles_per_pixel * 2 / timing.clock_config.apb1_divisor)
+      : timing.cycles_per_pixel;
+
+  tim.write_psc(apb_cycles_per_pixel - 1);
 
   tim.write_arr(timing.line_pixels - 1);
   tim.write_ccr1(timing.sync_pixels);
@@ -344,6 +351,15 @@ void configure_timing(Timing const &timing) {
 
   // Busy-wait for pending DMA to complete.
   while (dma2.stream5.read_cr().get_en());
+
+  // No scanout strategy can achieve fewer than 4 cycles per pixel.
+  ETL_ASSERT(timing.cycles_per_pixel >= 4);
+  // Because horizontal timing is managed by timers on the slower APB1 bus,
+  // make sure that we can express the (AHB) cycles_per_pixel in APB1 units.
+  if (timing.clock_config.apb1_divisor > 1) {
+    ETL_ASSERT(timing.cycles_per_pixel % (timing.clock_config.apb1_divisor / 2)
+                  == 0);
+  }
 
   // Switch to new CPU clock settings.
   rcc.configure_clocks(timing.clock_config);
@@ -491,7 +507,7 @@ static void end_of_active_video() {
       working_buffer_shape = {
         .offset = 0,
         .length = 0,
-        .stretch_cycles = 0,
+        .cycles_per_pixel = current_timing.cycles_per_pixel,
         .repeat_lines = 0,
       };
     }
@@ -579,11 +595,10 @@ static void prepare_for_scanout() {
   auto & st = dma2.stream5;
   st.write_cr(st.read_cr().with_en(false));
 
-  if (working_buffer_shape.stretch_cycles) {
+  if (working_buffer_shape.cycles_per_pixel > 4) {
     // Adjust reload frequency of TIM1 to accomodate desired pixel clock.
     // (ARR value is period - 1.)
-    tim1.write_arr(
-        working_buffer_shape.stretch_cycles + min_cycles_per_pixel - 1);
+    tim1.write_arr(working_buffer_shape.cycles_per_pixel - 1);
     // Force an update to reset the timer state.
     tim1.write_egr(AdvTimer::egr_value_t().with_ug(true));
     // Configure the timer as *almost* ready to produce a DRQ, less a small
@@ -671,8 +686,9 @@ static void rasterize_next_line() {
     // the new rasterizer no matter what the old one wished.
     auto r = current_band.rasterizer;
     if (r) {
-      working_buffer_shape = r->rasterize(visible_line,
-          working.buffer);
+      working_buffer_shape = r->rasterize(current_timing.cycles_per_pixel,
+                                          visible_line,
+                                          working.buffer);
       // Request a rewrite of the scanout buffer during next hblank.
       scan_buffer_needs_update = true;
     }

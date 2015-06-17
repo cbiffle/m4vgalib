@@ -36,14 +36,15 @@ Text_10x16::~Text_10x16() {
 }
 
 __attribute__((section(".ramcode")))
-Rasterizer::RasterInfo Text_10x16::rasterize(unsigned line_number,
-                                            Pixel *raster_target) {
+Rasterizer::RasterInfo Text_10x16::rasterize(unsigned cycles_per_pixel,
+                                             unsigned line_number,
+                                             Pixel *raster_target) {
   line_number -= _top_line;
 
   unsigned text_row = line_number / glyph_rows;
   unsigned row_in_glyph = line_number % glyph_rows;
 
-  if (text_row >= _rows) return { 0, 0, 0, 0 };
+  if (text_row >= _rows) return { 0, 0, cycles_per_pixel, 0 };
 
   std::uint32_t const *src = _fb + _cols * text_row;
   std::uint8_t const *font = _font + row_in_glyph * _chars_in_font;
@@ -58,7 +59,12 @@ Rasterizer::RasterInfo Text_10x16::rasterize(unsigned line_number,
 
   unpack_text_10p_attributed_impl(src, font, raster_target + _x_adj, _cols);
 
-  return { 0, _cols * glyph_cols - (_hide_right * glyph_cols), 0, 0 };
+  return {
+    .offset = 0,
+    .length = _cols * glyph_cols - (_hide_right * glyph_cols),
+    .cycles_per_pixel = cycles_per_pixel,
+    .repeat_lines = 0,
+  };
 }
 
 void Text_10x16::clear_framebuffer(Pixel bg) {

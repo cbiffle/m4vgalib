@@ -12,7 +12,7 @@ public:
 
   void set_color(Pixel p) { _color = p; }
 
-  RasterInfo rasterize(unsigned, Pixel *) override;
+  RasterInfo rasterize(unsigned, unsigned, Pixel *) override;
 
 private:
   unsigned _width;

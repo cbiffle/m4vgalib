@@ -29,7 +29,7 @@ public:
          unsigned top_line = 0);
   ~Direct();
 
-  RasterInfo rasterize(unsigned, Pixel *) override;
+  RasterInfo rasterize(unsigned, unsigned, Pixel *) override;
 
   void flip_now();
 

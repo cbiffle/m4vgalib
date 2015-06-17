@@ -38,7 +38,9 @@ Field16x4::~Field16x4() {
 }
 
 __attribute__((section(".ramcode")))
-auto Field16x4::rasterize(unsigned line_number, Pixel *target) -> RasterInfo {
+auto Field16x4::rasterize(unsigned cycles_per_pixel,
+                          unsigned line_number,
+                          Pixel *target) -> RasterInfo {
   line_number -= _top_line;
   auto repeat = 1 - (line_number % 2);
   line_number /= 2;
@@ -49,14 +51,21 @@ auto Field16x4::rasterize(unsigned line_number, Pixel *target) -> RasterInfo {
     if (_flip_pended.exchange(false)) flip_now();
   }
 
-  if (ETL_UNLIKELY(line_number >= _height)) return { 0, 0, 0, 0 };
+  if (ETL_UNLIKELY(line_number >= _height)) {
+    return { 0, 0, cycles_per_pixel, 0 };
+  }
 
   unsigned char const *src = _fb[_page1] + _width * line_number;
 
   unpack_p256_lerp4_d4_impl(src, target, _width,
                             _palettes[odd_line], _palettes[!odd_line]);
 
-  return { 0, _width * 16, 0, repeat };
+  return {
+    .offset = 0,
+    .length = _width * 16,
+    .cycles_per_pixel = cycles_per_pixel,
+    .repeat_lines = repeat,
+  };
 }
 
 void Field16x4::pend_flip() {

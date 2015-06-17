@@ -31,18 +31,27 @@ Direct::~Direct() {
 }
 
 __attribute__((section(".ramcode")))
-auto Direct::rasterize(unsigned line_number, Pixel *target) -> RasterInfo {
+auto Direct::rasterize(unsigned cycles_per_pixel,
+                       unsigned line_number,
+                       Pixel *target) -> RasterInfo {
   line_number -= _top_line;
   auto repeat = (_scale_y - 1) - (line_number % _scale_y);
   line_number /= _scale_y;
 
-  if (ETL_UNLIKELY(line_number >= _height)) return { 0, 0, 0, 0 };
+  if (ETL_UNLIKELY(line_number >= _height)) {
+    return { 0, 0, cycles_per_pixel, 0 };
+  }
 
   auto const *src = _fb[_page1] + _width * line_number;
 
   unpack_direct_impl(src, target, _width);
 
-  return { 0, _width, (_scale_x - 1) * 4, repeat };
+  return {
+    .offset = 0,
+    .length = _width,
+    .cycles_per_pixel = cycles_per_pixel * _scale_x,
+    .repeat_lines = repeat,
+  };
 }
 
 void Direct::flip_now() {

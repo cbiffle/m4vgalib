@@ -30,23 +30,25 @@ public:
     // Number of valid pixels generated in render target.
     unsigned length;
 
-    // Number of additional CPU cycles per pixel.  By default, each pixel takes
-    // 4 CPU cycles.  This can be used to add more -- for example, adding 4 here
-    // halves the horizontal resolution.
-    unsigned stretch_cycles;
+    // Number of AHB cycles per pixel.  The default value for this in the
+    // current mode is given to the rasterizer; the rasterizer may alter it
+    // in the result if desired.
+    unsigned cycles_per_pixel;
 
     // How many times to repeat this line of raster output, after the first.
     unsigned repeat_lines;
   };
 
   /*
-   * Produces a single scanline of pixels into a scan buffer.  Returns the
-   * number of pixels generated and an optional offset.
+   * Produces a single scanline of pixels into a scan buffer.  Returns a
+   * RasterInfo instance describing what was done.
    *
    * The line_number is relative to the first displayed line in the current
    * mode, not necessarily the first line handled by this Rasterizer!
    */
-  virtual RasterInfo rasterize(unsigned line_number, Pixel *raster_target) = 0;
+  virtual RasterInfo rasterize(unsigned cycles_per_pixel,
+                               unsigned line_number,
+                               Pixel *raster_target) = 0;
 
 protected:
   ~Rasterizer() = default;

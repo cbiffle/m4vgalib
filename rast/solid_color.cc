@@ -10,13 +10,15 @@ SolidColor::SolidColor(unsigned width, Pixel color)
     _color(color) {}
 
 __attribute__((section(".ramcode")))
-Rasterizer::RasterInfo SolidColor::rasterize(unsigned, Pixel *target) {
+Rasterizer::RasterInfo SolidColor::rasterize(unsigned cycles_per_pixel,
+                                             unsigned,
+                                             Pixel *target) {
   target[0] = _color;
 
   return {
     .offset = 0,
     .length = 1,
-    .stretch_cycles = (_width - 1) * 4,
+    .cycles_per_pixel = cycles_per_pixel * _width,
     .repeat_lines = 1000,
   };
 }

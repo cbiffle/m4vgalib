@@ -28,7 +28,7 @@ public:
 
   ~Bitmap_1();
 
-  virtual RasterInfo rasterize(unsigned, Pixel *) override;
+  RasterInfo rasterize(unsigned, unsigned, Pixel *) override;
 
   Bitmap get_bg_bitmap() const;
   Graphics1 make_bg_graphics() const;

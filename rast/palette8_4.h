@@ -18,7 +18,7 @@ public:
   Palette8_4(unsigned width, unsigned height, bool lerp, unsigned top_line = 0);
   ~Palette8_4();
 
-  virtual RasterInfo rasterize(unsigned, Pixel *) override;
+  RasterInfo rasterize(unsigned, unsigned, Pixel *) override;
 
   void flip_now();
 

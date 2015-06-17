@@ -17,7 +17,7 @@ class DirectMirror : public Rasterizer {
 public:
   DirectMirror(Direct const & rast, unsigned top_line = 0);
 
-  virtual RasterInfo rasterize(unsigned, Pixel *) override;
+  RasterInfo rasterize(unsigned, unsigned, Pixel *) override;
 
   unsigned get_width() const { return _r.get_width(); }
   unsigned get_height() const { return _r.get_height(); }

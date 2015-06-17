@@ -3,31 +3,32 @@
 namespace vga {
 
 Timing const timing_vesa_640x480_60hz = {
-  {
-    8000000,  // external crystal Hz
-    4,        // divide down to 2Mhz
-    201,      // multiply up to 402MHz VCO
-    4,        // divide by 4 for 100.5MHz CPU clock
-    9,        // divide by 9 for 48MHz-ish SDIO clock
-    1,        // divide CPU clock by 1 for 100.5MHz AHB clock
-    4,        // divide CPU clock by 4 for 25.125MHz APB1 clock.
-    2,        // divide CPU clock by 2 for 50.25MHz APB2 clock.
+  .clock_config = {
+    .crystal_hz = 8000000,  // 8 MHz
+    .crystal_divisor = 4,   // divide down to 2Mhz
+    .vco_multiplier = 201,  // multiply up to 402MHz VCO
+    .general_divisor = 4,   // divide VCO by 4 for 100.5MHz CPU clock
+    .pll48_divisor = 9,     // divide VCO by 9 for 48MHz-ish SDIO clock
+    
+    .ahb_divisor = 1,       // run AHB at CPU rate.
+    .apb1_divisor = 4,      // divide CPU clock by 4 for 25.125MHz APB1 clock.
+    .apb2_divisor = 2,      // divide CPU clock by 2 for 50.25MHz APB2 clock.
 
-    3,        // 3 wait states for 100.5MHz at 3.3V.
+    .flash_latency = 3,     // 3 wait states for 100.5MHz at 3.3V.
   },
 
-  800,   // line_pixels
-  96,    // sync_pixels
-  48,    // back_porch_pixels
-  25,    // video_lead
-  640,   // video_pixels,
-  Timing::Polarity::negative,
+  .line_pixels       = 800,
+  .sync_pixels       = 96,
+  .back_porch_pixels = 48,
+  .video_lead        = 25,
+  .video_pixels      = 640,
+  .hsync_polarity    = Timing::Polarity::negative,
 
-  10,
-  10 + 2,
-  10 + 2 + 33,
-  10 + 2 + 33 + 480,
-  Timing::Polarity::negative,
+  .vsync_start_line = 10,
+  .vsync_end_line   = 10 + 2,
+  .video_start_line = 10 + 2 + 33,
+  .video_end_line   = 10 + 2 + 33 + 480,
+  .vsync_polarity   = Timing::Polarity::negative,
 };
 
 Timing const timing_vesa_800x600_60hz = {

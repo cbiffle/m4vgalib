@@ -17,9 +17,10 @@ Direct::Direct(unsigned disp_width, unsigned disp_height,
     _scale_x(scale_x),
     _scale_y(scale_y),
     _top_line(top_line),
-    _page1(false),
     _fb{arena_new_array<Pixel>(_width * _height),
-        arena_new_array<Pixel>(_width * _height)} {
+        arena_new_array<Pixel>(_width * _height)},
+    _page1{false},
+    _flip_pended{false} {
   for (unsigned i = 0; i < _width * _height; ++i) {
     _fb[0][i] = 0;
     _fb[1][i] = 0;
@@ -56,6 +57,10 @@ auto Direct::rasterize(unsigned cycles_per_pixel,
 
 void Direct::flip_now() {
   _page1 = !_page1;
+}
+
+void Direct::pend_flip() {
+  _flip_pended = true;
 }
 
 }  // namespace rast

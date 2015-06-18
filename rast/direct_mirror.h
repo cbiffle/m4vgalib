@@ -9,13 +9,16 @@ namespace rast {
 
 /*
  * A variation on Direct that just redraws another rasterizer's content, but
- * upside down, backwards, and (possibly) vertically shifted.
+ * upside down.  The output can also be flipped horizontal (i.e. scanned out
+ * backwards) and vertically shifted.
  *
- * If this sounds like a rare use case, that's because it is.
+ * If you can't imagine how you'd use this... you are not imagining hard enough.
  */
 class DirectMirror : public Rasterizer {
 public:
-  DirectMirror(Direct const & rast, unsigned top_line = 0);
+  DirectMirror(Direct const & rast,
+               unsigned top_line,
+               bool flip_horizontal = true);
 
   RasterInfo rasterize(unsigned, unsigned, Pixel *) override;
 
@@ -27,6 +30,7 @@ public:
 private:
   Direct const & _r;
   unsigned _top_line;
+  bool _flip_horizontal;
 };
 
 }  // namespace rast

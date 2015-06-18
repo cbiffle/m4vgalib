@@ -5,14 +5,18 @@
 #include "vga/arena.h"
 #include "vga/copy_words.h"
 #include "vga/vga.h"
+#include "vga/rast/unpack_direct.h"
 #include "vga/rast/unpack_direct_rev.h"
 
 namespace vga {
 namespace rast {
 
-DirectMirror::DirectMirror(Direct const & rast, unsigned top_line)
+DirectMirror::DirectMirror(Direct const & rast,
+                           unsigned top_line,
+                           bool flip_horizontal)
   : _r(rast),
-    _top_line(top_line) {}
+    _top_line(top_line),
+    _flip_horizontal{flip_horizontal} {}
 
 __attribute__((section(".ramcode")))
 auto DirectMirror::rasterize(unsigned cycles_per_pixel,
@@ -28,11 +32,15 @@ auto DirectMirror::rasterize(unsigned cycles_per_pixel,
   line_number /= scale_y;
 
   if (ETL_UNLIKELY(line_number >= height)) return { 0, 0, cycles_per_pixel, 0 };
-  line_number = height - line_number;
+  line_number = height - line_number - 1 + _flip_horizontal;
 
   auto const *src = get_fg_buffer() + width * line_number;
 
-  unpack_direct_rev_impl(src, target, width);
+  if (_flip_horizontal) {
+    unpack_direct_rev_impl(src, target, width);
+  } else {
+    unpack_direct_impl(src, target, width);
+  }
 
   return {
     .offset = 0,

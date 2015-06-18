@@ -13,7 +13,7 @@ c_library('vga',
     'rast/direct_mirror.cc',
     'rast/direct.cc',
     'rast/field_16x4.cc',
-    'rast/palette8_4.cc',
+    'rast/palette8.cc',
     'rast/solid_color.cc',
     'rast/text_10x16.cc',
 

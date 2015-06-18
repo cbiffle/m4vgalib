@@ -53,6 +53,7 @@ public:
   Index *get_bg_buffer() const { return _fb[!_page1]; }
 
   Pixel * get_palette() { return _palette; }
+  Pixel const * get_palette() const { return _palette; }
 
 private:
   unsigned _width;

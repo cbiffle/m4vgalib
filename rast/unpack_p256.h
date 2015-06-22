@@ -8,7 +8,7 @@ namespace rast {
 
 void unpack_p256_impl(void const *input_line,
                       unsigned char *render_target,
-                      unsigned bytes_in_input,
+                      unsigned words_in_input,
                       std::uint8_t const * palette);
 
 }  // namespace rast

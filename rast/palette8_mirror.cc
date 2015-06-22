@@ -38,7 +38,7 @@ auto Palette8Mirror::rasterize(unsigned cycles_per_pixel,
 
   auto const *src = get_fg_buffer() + width * line_number;
 
-  unpack_p256_impl(src, target, width, get_palette());
+  unpack_p256_impl(src, target, width / sizeof(uint32_t), get_palette());
 
   return {
     .offset = 0,

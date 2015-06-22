@@ -51,7 +51,7 @@ Rasterizer::RasterInfo Palette8::rasterize(unsigned cycles_per_pixel,
 
   unsigned char const *src = _fb[_page1] + _width * line_number;
 
-  unpack_p256_impl(src, target, _width, _palette);
+  unpack_p256_impl(src, target, _width / sizeof(uint32_t), _palette);
   return {
     .offset = 0,
     .length = _width,

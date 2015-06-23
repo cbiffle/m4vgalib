@@ -5,7 +5,6 @@
 #include "vga/arena.h"
 #include "vga/copy_words.h"
 #include "vga/vga.h"
-#include "vga/rast/unpack_direct.h"
 #include "vga/rast/unpack_direct_rev.h"
 
 namespace vga {
@@ -39,7 +38,10 @@ auto DirectMirror::rasterize(unsigned cycles_per_pixel,
   if (_flip_horizontal) {
     unpack_direct_rev_impl(src, target, width);
   } else {
-    unpack_direct_impl(src, target, width);
+    copy_words(
+        (uint32_t const *) (void const *) src,
+        (uint32_t *) (void *) target,
+        width / sizeof(uint32_t));
   }
 
   return {

@@ -4,7 +4,7 @@
 
 #include "vga/arena.h"
 #include "vga/vga.h"
-#include "vga/rast/unpack_direct.h"
+#include "vga/copy_words.h"
 
 namespace vga {
 namespace rast {
@@ -45,7 +45,10 @@ auto Direct::rasterize(unsigned cycles_per_pixel,
 
   auto const *src = _fb[_page1] + _width * line_number;
 
-  unpack_direct_impl(src, target, _width);
+  copy_words(
+      (uint32_t const *) (void const *) src,
+      (uint32_t *) (void *) target,
+      _width / sizeof(uint32_t));
 
   return {
     .offset = 0,

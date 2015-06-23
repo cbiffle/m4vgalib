@@ -85,7 +85,7 @@ _ZN3vga4rast16unpack_1bpp_implEPKmPKhPhj:
       UNPACK_FOUR_PIXELS    @ Pixels 16-19                                  5
       UNPACK_FOUR_PIXELS    @ Pixels 20-23                                  5
       UNPACK_FOUR_PIXELS    @ Pixels 24-27                                  5
-      UNPACK_FOUR_PIXELS 1  @ Pixels 28-31                                  4
+      UNPACK_FOUR_PIXELS 0  @ Pixels 28-31                                  4
       subs words, #1                                                      @ 1
       bhi 0b                                                              @ 3/1
 

@@ -1,12 +1,16 @@
 .syntax unified
 .section .ramcode,"ax",%progbits
 
+.balign 4
+
 @ 1bpp pixel unpacker using two-color lookup table.
 @
 @ We unpack pixels in groups of four by copying them into the vector comparison
 @ result flags field (GE) of the PSR.  Once loaded there, we can use the sel
 @ instruction to look up four pixels at once in the CLUT, once it's been
 @ suitably prepared.
+@
+@ All cycle counts annotated below have been empirically verified.
 @
 @ Arguments:
 @  r0  start of input line containing 1bpp packed pixels (word-aligned)
@@ -26,10 +30,12 @@ _ZN3vga4rast16unpack_1bpp_implEPKmPKhPhj:
       vclut0      .req r4
       vclut1      .req r5
       bits        .req r6
+      tmp         .req r7
 
-      @ Actual code from here:
+      @ Actual code from here:                                          Cycles
 
-      push { vclut0, vclut1, bits }     @ Free up registers.                4
+      stmdb.w sp!, { vclut0, vclut1, bits, tmp }  @ Free up registers.      5
+      @ (using wide form to preserve 32-bit alignment)
 
       @ Prepare vector CLUTs in callee-save registers.
       @ We could load these in one go, yes, but the math below requires the
@@ -51,51 +57,57 @@ _ZN3vga4rast16unpack_1bpp_implEPKmPKhPhj:
       colors .req clut
       .unreq clut
 
-      @ Total cycles for startup:                                          10
+      @ Total cycles for startup:                                          11
 
       @ Enough paperwork.  Start unpacking!
       .balign 4
 0:    ldr bits, [framebuffer], #4       @ Load a block of 32 pixels.        2
-      ror bits, #16                     @ Rotate bits 3:0 into 19:16.       1
 
-      @ Oddly, when moving bits into the GE field of the PSR, they
-      @ don't come from the low order bits (as in the BFI instruction)
-      @ -- they must already be waiting in bits 19:16.  So we use
-      @ rotations to move pixels through these bits.
+      @ Process four bits as a unit.  The lsb=0 case must be run last, because
+      @ it destructively modifies 'target'.  The lsb=16 case should be run
+      @ first to best align the rest.
       @
-      @ We save a single cycle and four bytes on the final iteration
-      @ by suppressing the final rotate instruction.
-      @
-      @ Side note: the code below assumes that this macro leaves the
-      @ condition flags unaffected.
-      .macro UNPACK_FOUR_PIXELS rotate=1    @ 5 cyc (4 terminal)
-        msr APSR_g, bits              @ Load GE field.              2
+      @ Assembles to:
+      @ - 14 bytes / 4 cycles when lsb=0.
+      @ - 10 bytes / 3 cycles when lsb=16.
+      @ - 12 bytes / 4 cycles otherwise.
+      .macro STEP lsb
+        .if (\lsb - 16)
+          .ifgt (\lsb - 16)
+            lsrs tmp, bits, #(\lsb - 16)
+          .else
+            lsls tmp, bits, #(16 - \lsb)
+          .endif
+          msr APSR_g, tmp
+        .else
+          msr APSR_g, bits
+        .endif
         sel colors, vclut1, vclut0    @ Use it to mux colors.       1
-        str colors, [target], #4      @ Write to raster target.     1
-        .if \rotate
-          ror bits, #4                @ Prepare next pixels.        1
+        .if \lsb
+          str colors, [target, #\lsb]                             @ 1
+        .else
+          str colors, [target], #32                               @ 1
         .endif
       .endm
 
-      @ The unrolled 32-pixel unpacking code:
-      UNPACK_FOUR_PIXELS    @ Pixels 0-3                                    5
-      UNPACK_FOUR_PIXELS    @ Pixels 4-7                                    5
-      UNPACK_FOUR_PIXELS    @ Pixels 8-11                                   5
-      UNPACK_FOUR_PIXELS    @ Pixels 12-15                                  5
-      UNPACK_FOUR_PIXELS    @ Pixels 16-19                                  5
-      UNPACK_FOUR_PIXELS    @ Pixels 20-23                                  5
-      UNPACK_FOUR_PIXELS    @ Pixels 24-27                                  5
-      UNPACK_FOUR_PIXELS 0  @ Pixels 28-31                                  4
-      subs words, #1                                                      @ 1
-      bhi 0b                                                              @ 3/1
+      STEP 16                                                             @ 3
+      STEP 4                                                              @ 4
+      STEP 8                                                              @ 4
+      STEP 12                                                             @ 4
+      STEP 20                                                             @ 4
+      STEP 24                                                             @ 4
+      STEP 28                                                             @ 4
+      STEP 0                                                              @ 4
 
-      @ Total cycles for loop body:                                        46/44
+      subs words, #1                                                      @ 1
+      bhi 0b                                                              @ 2/1
+
+      @ Total cycles for loop body:                                        36/35
 
       @ Aaaaaand we're done.
-      pop { vclut0, vclut1, bits }                                        @ 4
-      bx lr   @ TODO: is this any more efficient than storing lr / popping pc?
-              @                                                             3?
-      @ Cycles for 800-pixel line: 1165, or 1.4562 c/p (2.75x realtime)
-      @ Empirically, it performs better than this, so I've doubtless been
-      @ slightly too conservative about the processor's ability to speculate
-      @ branches in the calculations above.
+      pop { vclut0, vclut1, bits, tmp }                                   @ 5
+      bx lr                                                               @ 2
+
+      @ Cycles for 800-pixel line, including return: 917, or 1.146 c/p (3.49x
+      @ realtime) using CCM; 942 (3.40x realtime) using SRAM112 due to fetch
+      @ contention.

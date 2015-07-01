@@ -501,15 +501,6 @@ static void end_of_active_video() {
       current_band = *band_list_head;
     } else {
       current_band = { nullptr, 0, nullptr };
-
-      // Load up a fake rasterizer output, to coopt the normal scan code into
-      // suppressing output.
-      working_buffer_shape = {
-        .offset = 0,
-        .length = 0,
-        .cycles_per_pixel = current_timing.cycles_per_pixel,
-        .repeat_lines = 0,
-      };
     }
     band_list_taken = true;
   } else if (next_line == current_timing.video_start_line) {
@@ -555,6 +546,7 @@ static bool advance_rasterizer_band(bool edge = false) {
     current_band = *current_band.next;
     return advance_rasterizer_band(true);
   } else {
+    current_band = { nullptr, 0, nullptr };
     return edge;
   }
 }
@@ -690,8 +682,15 @@ static void rasterize_next_line() {
                                           visible_line,
                                           working.buffer);
       // Request a rewrite of the scanout buffer during next hblank.
-      scan_buffer_needs_update = true;
+    } else {
+      working_buffer_shape = {
+        .offset = 0,
+        .length = 0,
+        .cycles_per_pixel = current_timing.cycles_per_pixel,
+        .repeat_lines = 0,
+      };
     }
+    scan_buffer_needs_update = true;
   } else {  // repeat_lines > 0, not band_edge
     --working_buffer_shape.repeat_lines;
   }

@@ -62,7 +62,7 @@ auto Field16x4::rasterize(unsigned cycles_per_pixel,
 
   return {
     .offset = 0,
-    .length = _width * 16,
+    .length = (_width - 1) * 16,
     .cycles_per_pixel = cycles_per_pixel,
     .repeat_lines = repeat,
   };

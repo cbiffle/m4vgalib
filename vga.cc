@@ -75,7 +75,7 @@ static constexpr unsigned
   max_pixels_per_line = 800,
   // Fudge factor: shifts timer-initiated DRQ back in time by this many cycles,
   // to delay DRQ until DMA has started.
-  drq_shift_cycles = 3,
+  drq_shift_cycles = 2,
   // Fudge factor: how long the shock absorber IRQ should lead the actual start
   // of video IRQ, in cycles.
   shock_absorber_shift_cycles = 20,

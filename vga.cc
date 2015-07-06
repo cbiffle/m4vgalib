@@ -75,7 +75,7 @@ static constexpr unsigned
   max_pixels_per_line = 800,
   // Fudge factor: shifts timer-initiated DRQ back in time by this many cycles,
   // to delay DRQ until DMA has started.
-  drq_shift_cycles = 4,
+  drq_shift_cycles = 3,
   // Fudge factor: how long the shock absorber IRQ should lead the actual start
   // of video IRQ, in cycles.
   shock_absorber_shift_cycles = 20,
@@ -170,6 +170,8 @@ static bool scan_buffer_needs_update;
 // This is set up during hblank based on the working_buffer_shape, and consumed
 // at start of active video.
 static Dma::Stream::cr_value_t next_dma_xfer;
+IN_LOCAL_RAM
+static bool next_use_timer;
 
 // The head of the linked list of Rasterizer bands.
 static Band const *band_list_head;
@@ -411,6 +413,16 @@ void configure_timing(Timing const &timing) {
   // Set up global state.
   current_line = 0;
   current_timing = timing;
+  state = State::blank;
+  working_buffer_shape = {
+    .offset = 0,
+    .length = 0,
+    .cycles_per_pixel = timing.cycles_per_pixel,
+    .repeat_lines = 0,
+  };
+  next_use_timer = false;
+
+  scan_buffer_needs_update = false;
 
   // Start TIM3, which starts TIM4.
   enable_irq(Interrupt::tim3);
@@ -464,7 +476,7 @@ static void start_of_active_video() {
   // Start the countdown for first DRQ.
   tim1.write_cr1(AdvTimer::cr1_value_t()
       .with_urs(true)
-      .with_cen(true));
+      .with_cen(next_use_timer));
 
   dma2.stream5.write_cr(next_dma_xfer);
 }
@@ -597,6 +609,7 @@ static void prepare_for_scanout() {
     // value (fudge factor).  Gotta do this after the update event, above,
     // because that clears CNT.
     tim1.write_cnt(uint32_t(tim1.read_arr()) - drq_shift_cycles);
+    tim1.write_sr(0);
 
     st.write_par(0x40021015);  // High byte of GPIOE ODR (hack hack)
     st.write_m0ar(reinterpret_cast<Word>(&scan_buffer));
@@ -628,6 +641,7 @@ static void prepare_for_scanout() {
         .with_minc(true)
         .with_psize(Dma::Stream::TransferSize::byte)
         .with_pinc(false);
+    next_use_timer = true;
 
   } else {
     // Note that we're using memory as the peripheral side.
@@ -659,6 +673,7 @@ static void prepare_for_scanout() {
         .with_pinc(true)
         .with_msize(Dma::Stream::TransferSize::byte)
         .with_minc(false);
+    next_use_timer = false;
   }
 }
 

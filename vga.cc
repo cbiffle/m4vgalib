@@ -27,7 +27,7 @@
 #include "etl/stm32f4xx/rcc.h"
 #include "etl/stm32f4xx/syscfg.h"
 
-#include "vga/arena.h"
+#include "vga/config.h"
 #include "vga/copy_words.h"
 #include "vga/rasterizer.h"
 #include "vga/timing.h"
@@ -40,24 +40,7 @@ using etl::armv7m::scb;
 using etl::armv7m::Scb;
 using etl::armv7m::Word;
 
-using etl::stm32f4xx::AdvTimer;
-using etl::stm32f4xx::AhbPeripheral;
-using etl::stm32f4xx::ApbPeripheral;
-using etl::stm32f4xx::dbg;
-using etl::stm32f4xx::Dbg;
-using etl::stm32f4xx::Dma;
-using etl::stm32f4xx::dma2;
-using etl::stm32f4xx::flash;
-using etl::stm32f4xx::Gpio;
-using etl::stm32f4xx::gpiob;
-using etl::stm32f4xx::gpioe;
-using etl::stm32f4xx::GpTimer;
-using etl::stm32f4xx::Interrupt;
-using etl::stm32f4xx::rcc;
-using etl::stm32f4xx::syscfg;
-using etl::stm32f4xx::tim1;
-using etl::stm32f4xx::tim3;
-using etl::stm32f4xx::tim4;
+using namespace etl::stm32f4xx;
 
 #define IN_SCAN_RAM ETL_SECTION(".vga_scan_ram")
 #define IN_LOCAL_RAM ETL_SECTION(".vga_local_ram")
@@ -203,7 +186,7 @@ void init() {
 
   // Turn a bunch of stuff on.
   rcc.enable_clock(AhbPeripheral::gpiob);  // Sync signals
-  rcc.enable_clock(AhbPeripheral::gpioe);  // Video
+  rcc.enable_clock(AhbPeripheral::VIDEO_GPIO);  // Video
   rcc.enable_clock(AhbPeripheral::dma2);
 
   auto &st = dma2.stream5;
@@ -267,8 +250,8 @@ void sync_off() {
 }
 
 void video_off() {
-  gpioe.set_mode(0xFF00, Gpio::Mode::input);
-  gpioe.set_pull(0xFF00, Gpio::Pull::down);
+  VIDEO_GPIO.set_mode(VIDEO_GPIO_MASK, Gpio::Mode::input);
+  VIDEO_GPIO.set_pull(VIDEO_GPIO_MASK, Gpio::Pull::down);
 }
 
 void sync_on() {
@@ -287,9 +270,9 @@ void sync_on() {
 void video_on() {
   // Configure the high byte of port E for parallel video.
   // Using 100MHz output speed gets slightly sharper transitions than 50MHz.
-  gpioe.set_output_type(0xFF00, Gpio::OutputType::push_pull);
-  gpioe.set_output_speed(0xFF00, Gpio::OutputSpeed::high_100mhz);
-  gpioe.set_mode(0xFF00, Gpio::Mode::gpio);
+  VIDEO_GPIO.set_output_type(VIDEO_GPIO_MASK, Gpio::OutputType::push_pull);
+  VIDEO_GPIO.set_output_speed(VIDEO_GPIO_MASK, Gpio::OutputSpeed::high_100mhz);
+  VIDEO_GPIO.set_mode(VIDEO_GPIO_MASK, Gpio::Mode::gpio);
 }
 
 /*
@@ -611,7 +594,7 @@ static void prepare_for_scanout() {
     tim1.write_cnt(uint32_t(tim1.read_arr()) - drq_shift_cycles);
     tim1.write_sr(0);
 
-    st.write_par(0x40021015);  // High byte of GPIOE ODR (hack hack)
+    st.write_par(VIDEO_GPIO_ODR);  // Used byte of VIDEO_GPIO ODR
     st.write_m0ar(reinterpret_cast<Word>(&scan_buffer));
 
     // The number of bytes read must exactly match the number of bytes written,
@@ -647,7 +630,7 @@ static void prepare_for_scanout() {
     // Note that we're using memory as the peripheral side.
     // This DMA controller is a little odd.
     st.write_par(reinterpret_cast<Word>(&scan_buffer));
-    st.write_m0ar(0x40021015);  // High byte of GPIOE ODR (hack hack)
+    st.write_m0ar(VIDEO_GPIO_ODR);  // Used byte of VIDEO_GPIO ODR
 
     Dma::Stream::TransferSize psize;
     switch (working_buffer_shape.length & 3) {
@@ -721,7 +704,7 @@ static void rasterize_next_line() {
 void vga_hblank_interrupt()
   __attribute__((weak, alias("_ZN3vga24default_hblank_interruptEv")));
 
-RAM_CODE void etl_stm32f4xx_tim3_handler() {
+IRQ RAM_CODE void etl_stm32f4xx_tim3_handler() {
   // We access this APB2 timer through the bridge on AHB1.  This implies
   // both wait states and resource conflicts with scanout.  Get done fast.
   tim3.write_sr(tim3.read_sr().with_cc2if(false));
@@ -733,7 +716,7 @@ RAM_CODE void etl_stm32f4xx_tim3_handler() {
   etl::armv7m::wait_for_interrupt();
 }
 
-RAM_CODE void etl_stm32f4xx_tim4_handler() {
+IRQ RAM_CODE void etl_stm32f4xx_tim4_handler() {
   // We have to clear our interrupt flags, or this will recur.
   auto sr = tim4.read_sr();
 
@@ -750,8 +733,7 @@ RAM_CODE void etl_stm32f4xx_tim4_handler() {
   }
 }
 
-RAM_CODE
-void etl_armv7m_pend_sv_handler() {
+IRQ RAM_CODE void etl_armv7m_pend_sv_handler() {
   // PendSV event is triggered shortly after EAV to process lower-priority
   // tasks.
 

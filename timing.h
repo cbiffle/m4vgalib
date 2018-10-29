@@ -71,6 +71,9 @@ struct Timing {
 extern Timing const timing_vesa_640x480_60hz;
 extern Timing const timing_vesa_800x600_60hz;
 
+// This non-VESA mode is useful if you need exactly 48 MHz for USB clock
+extern Timing const timing_800x600_56hz;
+
 }  // namespace vga
 
 #endif  // VGA_TIMING_H

@@ -1,3 +1,11 @@
+This is my original, C++-based attempt at embedded high quality video. For a
+newer, more featureful, and far more robust version, see:
+
+https://github.com/cbiffle/m4vga-rs
+
+Original Readme
+===============
+
 This library provides high-quality, high-resolution color graphics output from
 STM32F40x/1x microcontrollers, using very few external components.
 
